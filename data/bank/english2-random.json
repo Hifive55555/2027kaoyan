@@ -1,0 +1,1870 @@
+{
+  "meta": {
+    "subject": "english2",
+    "source": "AI-generated seed",
+    "count": 60,
+    "note": "用于随机刷题/1v1 的短英语题，AI 生成，非真题。"
+  },
+  "questions": [
+    {
+      "id": "english2-random-1",
+      "subject": "english2",
+      "year": 0,
+      "number": 1,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "affect/effect辨析",
+      "difficulty": "提高",
+      "stem": "The new policy may ___ small businesses.",
+      "options": [
+        {
+          "key": "A",
+          "text": "affect"
+        },
+        {
+          "key": "B",
+          "text": "effect"
+        },
+        {
+          "key": "C",
+          "text": "afford"
+        },
+        {
+          "key": "D",
+          "text": "reflect"
+        }
+      ],
+      "answer": "A",
+      "explanation": "affect是动词，意为“影响”。"
+    },
+    {
+      "id": "english2-random-2",
+      "subject": "english2",
+      "year": 0,
+      "number": 2,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "adapt/adopt辨析",
+      "difficulty": "基础",
+      "stem": "It took her a while to ___ to the new environment.",
+      "options": [
+        {
+          "key": "A",
+          "text": "adopt"
+        },
+        {
+          "key": "B",
+          "text": "adapt"
+        },
+        {
+          "key": "C",
+          "text": "apply"
+        },
+        {
+          "key": "D",
+          "text": "appeal"
+        }
+      ],
+      "answer": "B",
+      "explanation": "adapt to表示“适应”。"
+    },
+    {
+      "id": "english2-random-3",
+      "subject": "english2",
+      "year": 0,
+      "number": 3,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "economic/economical辨析",
+      "difficulty": "提高",
+      "stem": "Buying a used car is more ___ for us.",
+      "options": [
+        {
+          "key": "A",
+          "text": "economic"
+        },
+        {
+          "key": "B",
+          "text": "economical"
+        },
+        {
+          "key": "C",
+          "text": "economics"
+        },
+        {
+          "key": "D",
+          "text": "economy"
+        }
+      ],
+      "answer": "B",
+      "explanation": "economical表示“经济实惠的”。"
+    },
+    {
+      "id": "english2-random-4",
+      "subject": "english2",
+      "year": 0,
+      "number": 4,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "considerable/considerate辨析",
+      "difficulty": "提高",
+      "stem": "It was ___ of him to call and cancel.",
+      "options": [
+        {
+          "key": "A",
+          "text": "considerable"
+        },
+        {
+          "key": "B",
+          "text": "considerate"
+        },
+        {
+          "key": "C",
+          "text": "considering"
+        },
+        {
+          "key": "D",
+          "text": "consideration"
+        }
+      ],
+      "answer": "B",
+      "explanation": "considerate表示“体贴的”。"
+    },
+    {
+      "id": "english2-random-5",
+      "subject": "english2",
+      "year": 0,
+      "number": 5,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "raise/rise辨析",
+      "difficulty": "基础",
+      "stem": "Prices have ___ sharply this year.",
+      "options": [
+        {
+          "key": "A",
+          "text": "raised"
+        },
+        {
+          "key": "B",
+          "text": "risen"
+        },
+        {
+          "key": "C",
+          "text": "arose"
+        },
+        {
+          "key": "D",
+          "text": "aroused"
+        }
+      ],
+      "answer": "B",
+      "explanation": "rise是不及物动词，意为“上升”。"
+    },
+    {
+      "id": "english2-random-6",
+      "subject": "english2",
+      "year": 0,
+      "number": 6,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "lie/lay辨析",
+      "difficulty": "提高",
+      "stem": "Don't ___ your bag on the wet floor.",
+      "options": [
+        {
+          "key": "A",
+          "text": "lie"
+        },
+        {
+          "key": "B",
+          "text": "lay"
+        },
+        {
+          "key": "C",
+          "text": "laid"
+        },
+        {
+          "key": "D",
+          "text": "lain"
+        }
+      ],
+      "answer": "B",
+      "explanation": "lay是及物动词，意为“放置”。"
+    },
+    {
+      "id": "english2-random-7",
+      "subject": "english2",
+      "year": 0,
+      "number": 7,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "principal/principle辨析",
+      "difficulty": "基础",
+      "stem": "The school ___ will speak at the ceremony.",
+      "options": [
+        {
+          "key": "A",
+          "text": "principle"
+        },
+        {
+          "key": "B",
+          "text": "principal"
+        },
+        {
+          "key": "C",
+          "text": "principled"
+        },
+        {
+          "key": "D",
+          "text": "principally"
+        }
+      ],
+      "answer": "B",
+      "explanation": "principal表示“校长”。"
+    },
+    {
+      "id": "english2-random-8",
+      "subject": "english2",
+      "year": 0,
+      "number": 8,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "sensible/sensitive辨析",
+      "difficulty": "提高",
+      "stem": "She is very ___ to criticism.",
+      "options": [
+        {
+          "key": "A",
+          "text": "sensible"
+        },
+        {
+          "key": "B",
+          "text": "sensitive"
+        },
+        {
+          "key": "C",
+          "text": "senseless"
+        },
+        {
+          "key": "D",
+          "text": "sensory"
+        }
+      ],
+      "answer": "B",
+      "explanation": "sensitive to表示“对……敏感”。"
+    },
+    {
+      "id": "english2-random-9",
+      "subject": "english2",
+      "year": 0,
+      "number": 9,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "personal/personnel辨析",
+      "difficulty": "基础",
+      "stem": "The company's ___ department is hiring.",
+      "options": [
+        {
+          "key": "A",
+          "text": "personal"
+        },
+        {
+          "key": "B",
+          "text": "personnel"
+        },
+        {
+          "key": "C",
+          "text": "person"
+        },
+        {
+          "key": "D",
+          "text": "personality"
+        }
+      ],
+      "answer": "B",
+      "explanation": "personnel表示“人事部门”。"
+    },
+    {
+      "id": "english2-random-10",
+      "subject": "english2",
+      "year": 0,
+      "number": 10,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "complement/compliment辨析",
+      "difficulty": "提高",
+      "stem": "The wine will ___ the meal nicely.",
+      "options": [
+        {
+          "key": "A",
+          "text": "compliment"
+        },
+        {
+          "key": "B",
+          "text": "complement"
+        },
+        {
+          "key": "C",
+          "text": "complete"
+        },
+        {
+          "key": "D",
+          "text": "compete"
+        }
+      ],
+      "answer": "B",
+      "explanation": "complement表示“补充、与……相配”。"
+    },
+    {
+      "id": "english2-random-11",
+      "subject": "english2",
+      "year": 0,
+      "number": 11,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "ensure/assure辨析",
+      "difficulty": "基础",
+      "stem": "Please ___ that the door is locked.",
+      "options": [
+        {
+          "key": "A",
+          "text": "assure"
+        },
+        {
+          "key": "B",
+          "text": "insure"
+        },
+        {
+          "key": "C",
+          "text": "ensure"
+        },
+        {
+          "key": "D",
+          "text": "reassure"
+        }
+      ],
+      "answer": "C",
+      "explanation": "ensure表示“确保”。"
+    },
+    {
+      "id": "english2-random-12",
+      "subject": "english2",
+      "year": 0,
+      "number": 12,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "respectful/respectable辨析",
+      "difficulty": "提高",
+      "stem": "Students should be ___ to their teachers.",
+      "options": [
+        {
+          "key": "A",
+          "text": "respectable"
+        },
+        {
+          "key": "B",
+          "text": "respectful"
+        },
+        {
+          "key": "C",
+          "text": "respective"
+        },
+        {
+          "key": "D",
+          "text": "respected"
+        }
+      ],
+      "answer": "B",
+      "explanation": "respectful表示“尊敬的、恭敬的”。"
+    },
+    {
+      "id": "english2-random-13",
+      "subject": "english2",
+      "year": 0,
+      "number": 13,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "historic/historical辨析",
+      "difficulty": "冲刺",
+      "stem": "The signing was a ___ moment for both nations.",
+      "options": [
+        {
+          "key": "A",
+          "text": "historical"
+        },
+        {
+          "key": "B",
+          "text": "historic"
+        },
+        {
+          "key": "C",
+          "text": "history"
+        },
+        {
+          "key": "D",
+          "text": "historian"
+        }
+      ],
+      "answer": "B",
+      "explanation": "historic表示“有历史意义的”。"
+    },
+    {
+      "id": "english2-random-14",
+      "subject": "english2",
+      "year": 0,
+      "number": 14,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "continual/continuous辨析",
+      "difficulty": "冲刺",
+      "stem": "The machine makes a ___ humming noise.",
+      "options": [
+        {
+          "key": "A",
+          "text": "continual"
+        },
+        {
+          "key": "B",
+          "text": "continuous"
+        },
+        {
+          "key": "C",
+          "text": "continued"
+        },
+        {
+          "key": "D",
+          "text": "continuing"
+        }
+      ],
+      "answer": "B",
+      "explanation": "continuous表示“连续不断的”。"
+    },
+    {
+      "id": "english2-random-15",
+      "subject": "english2",
+      "year": 0,
+      "number": 15,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "eligible/legible辨析",
+      "difficulty": "冲刺",
+      "stem": "Only members are ___ to vote.",
+      "options": [
+        {
+          "key": "A",
+          "text": "legible"
+        },
+        {
+          "key": "B",
+          "text": "eligible"
+        },
+        {
+          "key": "C",
+          "text": "elective"
+        },
+        {
+          "key": "D",
+          "text": "intelligent"
+        }
+      ],
+      "answer": "B",
+      "explanation": "eligible表示“有资格的”。"
+    },
+    {
+      "id": "english2-random-16",
+      "subject": "english2",
+      "year": 0,
+      "number": 16,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "explicit/implicit辨析",
+      "difficulty": "提高",
+      "stem": "The instructions were ___ and easy to follow.",
+      "options": [
+        {
+          "key": "A",
+          "text": "implicit"
+        },
+        {
+          "key": "B",
+          "text": "explicit"
+        },
+        {
+          "key": "C",
+          "text": "explosive"
+        },
+        {
+          "key": "D",
+          "text": "exclusive"
+        }
+      ],
+      "answer": "B",
+      "explanation": "explicit表示“清楚明确的”。"
+    },
+    {
+      "id": "english2-random-17",
+      "subject": "english2",
+      "year": 0,
+      "number": 17,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "industrial/industrious辨析",
+      "difficulty": "冲刺",
+      "stem": "He is an ___ student who never wastes time.",
+      "options": [
+        {
+          "key": "A",
+          "text": "industrial"
+        },
+        {
+          "key": "B",
+          "text": "industrious"
+        },
+        {
+          "key": "C",
+          "text": "industry"
+        },
+        {
+          "key": "D",
+          "text": "industrialized"
+        }
+      ],
+      "answer": "B",
+      "explanation": "industrious表示“勤奋的”。"
+    },
+    {
+      "id": "english2-random-18",
+      "subject": "english2",
+      "year": 0,
+      "number": 18,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "moral/morale辨析",
+      "difficulty": "提高",
+      "stem": "The team's ___ rose after the victory.",
+      "options": [
+        {
+          "key": "A",
+          "text": "moral"
+        },
+        {
+          "key": "B",
+          "text": "morale"
+        },
+        {
+          "key": "C",
+          "text": "morality"
+        },
+        {
+          "key": "D",
+          "text": "morally"
+        }
+      ],
+      "answer": "B",
+      "explanation": "morale表示“士气”。"
+    },
+    {
+      "id": "english2-random-19",
+      "subject": "english2",
+      "year": 0,
+      "number": 19,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "beside/besides辨析",
+      "difficulty": "基础",
+      "stem": "___ English, she speaks French.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Beside"
+        },
+        {
+          "key": "B",
+          "text": "Besides"
+        },
+        {
+          "key": "C",
+          "text": "Except"
+        },
+        {
+          "key": "D",
+          "text": "Aside"
+        }
+      ],
+      "answer": "B",
+      "explanation": "besides表示“除……之外还有”。"
+    },
+    {
+      "id": "english2-random-20",
+      "subject": "english2",
+      "year": 0,
+      "number": 20,
+      "type": "choice",
+      "chapter": "词汇",
+      "topic": "farther/further辨析",
+      "difficulty": "提高",
+      "stem": "We need ___ information before deciding.",
+      "options": [
+        {
+          "key": "A",
+          "text": "farther"
+        },
+        {
+          "key": "B",
+          "text": "further"
+        },
+        {
+          "key": "C",
+          "text": "far"
+        },
+        {
+          "key": "D",
+          "text": "furthest"
+        }
+      ],
+      "answer": "B",
+      "explanation": "further可表示“更多的、进一步的”。"
+    },
+    {
+      "id": "english2-random-21",
+      "subject": "english2",
+      "year": 0,
+      "number": 21,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "account for",
+      "difficulty": "基础",
+      "stem": "How do you ___ the delay?",
+      "options": [
+        {
+          "key": "A",
+          "text": "account for"
+        },
+        {
+          "key": "B",
+          "text": "account to"
+        },
+        {
+          "key": "C",
+          "text": "account with"
+        },
+        {
+          "key": "D",
+          "text": "account on"
+        }
+      ],
+      "answer": "A",
+      "explanation": "account for表示“解释、说明”。"
+    },
+    {
+      "id": "english2-random-22",
+      "subject": "english2",
+      "year": 0,
+      "number": 22,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "in charge of",
+      "difficulty": "提高",
+      "stem": "She is ___ the marketing team.",
+      "options": [
+        {
+          "key": "A",
+          "text": "in charge of"
+        },
+        {
+          "key": "B",
+          "text": "in charge for"
+        },
+        {
+          "key": "C",
+          "text": "on charge of"
+        },
+        {
+          "key": "D",
+          "text": "at charge of"
+        }
+      ],
+      "answer": "A",
+      "explanation": "in charge of表示“负责”。"
+    },
+    {
+      "id": "english2-random-23",
+      "subject": "english2",
+      "year": 0,
+      "number": 23,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "make up for",
+      "difficulty": "提高",
+      "stem": "Nothing can ___ the loss of time.",
+      "options": [
+        {
+          "key": "A",
+          "text": "make up for"
+        },
+        {
+          "key": "B",
+          "text": "make up to"
+        },
+        {
+          "key": "C",
+          "text": "make for"
+        },
+        {
+          "key": "D",
+          "text": "make out"
+        }
+      ],
+      "answer": "A",
+      "explanation": "make up for表示“弥补”。"
+    },
+    {
+      "id": "english2-random-24",
+      "subject": "english2",
+      "year": 0,
+      "number": 24,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "put up with",
+      "difficulty": "基础",
+      "stem": "I can't ___ this noise any longer.",
+      "options": [
+        {
+          "key": "A",
+          "text": "put up with"
+        },
+        {
+          "key": "B",
+          "text": "put off"
+        },
+        {
+          "key": "C",
+          "text": "put on"
+        },
+        {
+          "key": "D",
+          "text": "put out"
+        }
+      ],
+      "answer": "A",
+      "explanation": "put up with表示“忍受”。"
+    },
+    {
+      "id": "english2-random-25",
+      "subject": "english2",
+      "year": 0,
+      "number": 25,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "look forward to",
+      "difficulty": "提高",
+      "stem": "We look forward to ___ from you.",
+      "options": [
+        {
+          "key": "A",
+          "text": "hear"
+        },
+        {
+          "key": "B",
+          "text": "hearing"
+        },
+        {
+          "key": "C",
+          "text": "heard"
+        },
+        {
+          "key": "D",
+          "text": "be heard"
+        }
+      ],
+      "answer": "B",
+      "explanation": "look forward to中to是介词，后接动名词。"
+    },
+    {
+      "id": "english2-random-26",
+      "subject": "english2",
+      "year": 0,
+      "number": 26,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "be subject to",
+      "difficulty": "冲刺",
+      "stem": "All prices are ___ change without notice.",
+      "options": [
+        {
+          "key": "A",
+          "text": "subject to"
+        },
+        {
+          "key": "B",
+          "text": "subject for"
+        },
+        {
+          "key": "C",
+          "text": "subjected with"
+        },
+        {
+          "key": "D",
+          "text": "subjecting to"
+        }
+      ],
+      "answer": "A",
+      "explanation": "be subject to表示“可能受到……影响”。"
+    },
+    {
+      "id": "english2-random-27",
+      "subject": "english2",
+      "year": 0,
+      "number": 27,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "in terms of",
+      "difficulty": "提高",
+      "stem": "___ cost, this plan is better.",
+      "options": [
+        {
+          "key": "A",
+          "text": "In terms of"
+        },
+        {
+          "key": "B",
+          "text": "In term of"
+        },
+        {
+          "key": "C",
+          "text": "On terms of"
+        },
+        {
+          "key": "D",
+          "text": "By terms of"
+        }
+      ],
+      "answer": "A",
+      "explanation": "in terms of表示“就……而言”。"
+    },
+    {
+      "id": "english2-random-28",
+      "subject": "english2",
+      "year": 0,
+      "number": 28,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "at the expense of",
+      "difficulty": "提高",
+      "stem": "He succeeded ___ his health.",
+      "options": [
+        {
+          "key": "A",
+          "text": "at the expense of"
+        },
+        {
+          "key": "B",
+          "text": "in expense of"
+        },
+        {
+          "key": "C",
+          "text": "for expense of"
+        },
+        {
+          "key": "D",
+          "text": "by expense of"
+        }
+      ],
+      "answer": "A",
+      "explanation": "at the expense of表示“以……为代价”。"
+    },
+    {
+      "id": "english2-random-29",
+      "subject": "english2",
+      "year": 0,
+      "number": 29,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "come up with",
+      "difficulty": "基础",
+      "stem": "They need to ___ a new solution.",
+      "options": [
+        {
+          "key": "A",
+          "text": "come up with"
+        },
+        {
+          "key": "B",
+          "text": "come up to"
+        },
+        {
+          "key": "C",
+          "text": "come across"
+        },
+        {
+          "key": "D",
+          "text": "come down with"
+        }
+      ],
+      "answer": "A",
+      "explanation": "come up with表示“提出、想出”。"
+    },
+    {
+      "id": "english2-random-30",
+      "subject": "english2",
+      "year": 0,
+      "number": 30,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "get rid of",
+      "difficulty": "基础",
+      "stem": "It's time to ___ these old files.",
+      "options": [
+        {
+          "key": "A",
+          "text": "get rid of"
+        },
+        {
+          "key": "B",
+          "text": "get away"
+        },
+        {
+          "key": "C",
+          "text": "get over"
+        },
+        {
+          "key": "D",
+          "text": "get through"
+        }
+      ],
+      "answer": "A",
+      "explanation": "get rid of表示“摆脱、处理掉”。"
+    },
+    {
+      "id": "english2-random-31",
+      "subject": "english2",
+      "year": 0,
+      "number": 31,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "on behalf of",
+      "difficulty": "提高",
+      "stem": "I'm speaking ___ the whole team.",
+      "options": [
+        {
+          "key": "A",
+          "text": "on behalf of"
+        },
+        {
+          "key": "B",
+          "text": "in behalf of"
+        },
+        {
+          "key": "C",
+          "text": "at behalf of"
+        },
+        {
+          "key": "D",
+          "text": "for behalf of"
+        }
+      ],
+      "answer": "A",
+      "explanation": "on behalf of表示“代表”。"
+    },
+    {
+      "id": "english2-random-32",
+      "subject": "english2",
+      "year": 0,
+      "number": 32,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "take advantage of",
+      "difficulty": "提高",
+      "stem": "Don't let others ___ your kindness.",
+      "options": [
+        {
+          "key": "A",
+          "text": "take advantage of"
+        },
+        {
+          "key": "B",
+          "text": "take advantage from"
+        },
+        {
+          "key": "C",
+          "text": "take advantage to"
+        },
+        {
+          "key": "D",
+          "text": "take advantage in"
+        }
+      ],
+      "answer": "A",
+      "explanation": "take advantage of表示“利用”。"
+    },
+    {
+      "id": "english2-random-33",
+      "subject": "english2",
+      "year": 0,
+      "number": 33,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "in contrast to",
+      "difficulty": "提高",
+      "stem": "___ her sister, she enjoys sports.",
+      "options": [
+        {
+          "key": "A",
+          "text": "In contrast to"
+        },
+        {
+          "key": "B",
+          "text": "In contrast at"
+        },
+        {
+          "key": "C",
+          "text": "On contrast to"
+        },
+        {
+          "key": "D",
+          "text": "By contrast to"
+        }
+      ],
+      "answer": "A",
+      "explanation": "in contrast to表示“与……相比”。"
+    },
+    {
+      "id": "english2-random-34",
+      "subject": "english2",
+      "year": 0,
+      "number": 34,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "be attributed to",
+      "difficulty": "冲刺",
+      "stem": "The success can be ___ hard work.",
+      "options": [
+        {
+          "key": "A",
+          "text": "attributed to"
+        },
+        {
+          "key": "B",
+          "text": "contributed to"
+        },
+        {
+          "key": "C",
+          "text": "distributed to"
+        },
+        {
+          "key": "D",
+          "text": "devoted to"
+        }
+      ],
+      "answer": "A",
+      "explanation": "be attributed to表示“归因于”。"
+    },
+    {
+      "id": "english2-random-35",
+      "subject": "english2",
+      "year": 0,
+      "number": 35,
+      "type": "choice",
+      "chapter": "短语",
+      "topic": "run out of",
+      "difficulty": "提高",
+      "stem": "We have ___ time.",
+      "options": [
+        {
+          "key": "A",
+          "text": "run out of"
+        },
+        {
+          "key": "B",
+          "text": "run out"
+        },
+        {
+          "key": "C",
+          "text": "run into"
+        },
+        {
+          "key": "D",
+          "text": "run over"
+        }
+      ],
+      "answer": "A",
+      "explanation": "run out of表示“用完”。"
+    },
+    {
+      "id": "english2-random-36",
+      "subject": "english2",
+      "year": 0,
+      "number": 36,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "主谓一致",
+      "difficulty": "基础",
+      "stem": "Each of the students ___ a book.",
+      "options": [
+        {
+          "key": "A",
+          "text": "have"
+        },
+        {
+          "key": "B",
+          "text": "has"
+        },
+        {
+          "key": "C",
+          "text": "having"
+        },
+        {
+          "key": "D",
+          "text": "are having"
+        }
+      ],
+      "answer": "B",
+      "explanation": "each作主语时谓语用单数。"
+    },
+    {
+      "id": "english2-random-37",
+      "subject": "english2",
+      "year": 0,
+      "number": 37,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "过去完成时",
+      "difficulty": "提高",
+      "stem": "By the time we arrived, the film ___.",
+      "options": [
+        {
+          "key": "A",
+          "text": "started"
+        },
+        {
+          "key": "B",
+          "text": "had started"
+        },
+        {
+          "key": "C",
+          "text": "has started"
+        },
+        {
+          "key": "D",
+          "text": "starts"
+        }
+      ],
+      "answer": "B",
+      "explanation": "到过去某时前已发生，用过去完成时。"
+    },
+    {
+      "id": "english2-random-38",
+      "subject": "english2",
+      "year": 0,
+      "number": 38,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "被动语态",
+      "difficulty": "基础",
+      "stem": "The report ___ by Friday.",
+      "options": [
+        {
+          "key": "A",
+          "text": "must finish"
+        },
+        {
+          "key": "B",
+          "text": "must be finished"
+        },
+        {
+          "key": "C",
+          "text": "must finished"
+        },
+        {
+          "key": "D",
+          "text": "must finishing"
+        }
+      ],
+      "answer": "B",
+      "explanation": "report与finish是被动关系。"
+    },
+    {
+      "id": "english2-random-39",
+      "subject": "english2",
+      "year": 0,
+      "number": 39,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "虚拟语气",
+      "difficulty": "提高",
+      "stem": "I suggest that he ___ earlier.",
+      "options": [
+        {
+          "key": "A",
+          "text": "comes"
+        },
+        {
+          "key": "B",
+          "text": "come"
+        },
+        {
+          "key": "C",
+          "text": "came"
+        },
+        {
+          "key": "D",
+          "text": "will come"
+        }
+      ],
+      "answer": "B",
+      "explanation": "suggest后从句用should do，should可省略。"
+    },
+    {
+      "id": "english2-random-40",
+      "subject": "english2",
+      "year": 0,
+      "number": 40,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "定语从句",
+      "difficulty": "基础",
+      "stem": "The book ___ I borrowed is interesting.",
+      "options": [
+        {
+          "key": "A",
+          "text": "who"
+        },
+        {
+          "key": "B",
+          "text": "whom"
+        },
+        {
+          "key": "C",
+          "text": "which"
+        },
+        {
+          "key": "D",
+          "text": "whose"
+        }
+      ],
+      "answer": "C",
+      "explanation": "先行词book指物，关系代词用which。"
+    },
+    {
+      "id": "english2-random-41",
+      "subject": "english2",
+      "year": 0,
+      "number": 41,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "非谓语动词",
+      "difficulty": "提高",
+      "stem": "___ tired, she went to bed early.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Feeling"
+        },
+        {
+          "key": "B",
+          "text": "Felt"
+        },
+        {
+          "key": "C",
+          "text": "To feel"
+        },
+        {
+          "key": "D",
+          "text": "Feel"
+        }
+      ],
+      "answer": "A",
+      "explanation": "she与feel是主动关系，用现在分词。"
+    },
+    {
+      "id": "english2-random-42",
+      "subject": "english2",
+      "year": 0,
+      "number": 42,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "冠词",
+      "difficulty": "基础",
+      "stem": "He is ___ honest man.",
+      "options": [
+        {
+          "key": "A",
+          "text": "a"
+        },
+        {
+          "key": "B",
+          "text": "an"
+        },
+        {
+          "key": "C",
+          "text": "the"
+        },
+        {
+          "key": "D",
+          "text": "/"
+        }
+      ],
+      "answer": "B",
+      "explanation": "honest以元音音素开头，用an。"
+    },
+    {
+      "id": "english2-random-43",
+      "subject": "english2",
+      "year": 0,
+      "number": 43,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "比较级",
+      "difficulty": "基础",
+      "stem": "This problem is ___ than that one.",
+      "options": [
+        {
+          "key": "A",
+          "text": "difficult"
+        },
+        {
+          "key": "B",
+          "text": "more difficult"
+        },
+        {
+          "key": "C",
+          "text": "most difficult"
+        },
+        {
+          "key": "D",
+          "text": "as difficult"
+        }
+      ],
+      "answer": "B",
+      "explanation": "than前用比较级more difficult。"
+    },
+    {
+      "id": "english2-random-44",
+      "subject": "english2",
+      "year": 0,
+      "number": 44,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "倒装句",
+      "difficulty": "提高",
+      "stem": "Never ___ such a beautiful scene.",
+      "options": [
+        {
+          "key": "A",
+          "text": "I have seen"
+        },
+        {
+          "key": "B",
+          "text": "have I seen"
+        },
+        {
+          "key": "C",
+          "text": "I saw"
+        },
+        {
+          "key": "D",
+          "text": "did I saw"
+        }
+      ],
+      "answer": "B",
+      "explanation": "否定词Never置于句首，句子部分倒装。"
+    },
+    {
+      "id": "english2-random-45",
+      "subject": "english2",
+      "year": 0,
+      "number": 45,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "虚拟条件句",
+      "difficulty": "冲刺",
+      "stem": "If I ___ you, I would apologize.",
+      "options": [
+        {
+          "key": "A",
+          "text": "am"
+        },
+        {
+          "key": "B",
+          "text": "was"
+        },
+        {
+          "key": "C",
+          "text": "were"
+        },
+        {
+          "key": "D",
+          "text": "be"
+        }
+      ],
+      "answer": "C",
+      "explanation": "与现在事实相反，if从句用were。"
+    },
+    {
+      "id": "english2-random-46",
+      "subject": "english2",
+      "year": 0,
+      "number": 46,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "情态动词完成式",
+      "difficulty": "冲刺",
+      "stem": "You ___ have told me earlier.",
+      "options": [
+        {
+          "key": "A",
+          "text": "should"
+        },
+        {
+          "key": "B",
+          "text": "should have"
+        },
+        {
+          "key": "C",
+          "text": "must"
+        },
+        {
+          "key": "D",
+          "text": "can"
+        }
+      ],
+      "answer": "B",
+      "explanation": "should have done表示“本该做而未做”。"
+    },
+    {
+      "id": "english2-random-47",
+      "subject": "english2",
+      "year": 0,
+      "number": 47,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "动名词作宾语",
+      "difficulty": "提高",
+      "stem": "She avoided ___ the question.",
+      "options": [
+        {
+          "key": "A",
+          "text": "answer"
+        },
+        {
+          "key": "B",
+          "text": "to answer"
+        },
+        {
+          "key": "C",
+          "text": "answering"
+        },
+        {
+          "key": "D",
+          "text": "answered"
+        }
+      ],
+      "answer": "C",
+      "explanation": "avoid后接动名词作宾语。"
+    },
+    {
+      "id": "english2-random-48",
+      "subject": "english2",
+      "year": 0,
+      "number": 48,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "代词一致",
+      "difficulty": "提高",
+      "stem": "The company has changed ___ policy.",
+      "options": [
+        {
+          "key": "A",
+          "text": "its"
+        },
+        {
+          "key": "B",
+          "text": "their"
+        },
+        {
+          "key": "C",
+          "text": "it's"
+        },
+        {
+          "key": "D",
+          "text": "they're"
+        }
+      ],
+      "answer": "A",
+      "explanation": "company视为单数，用its。"
+    },
+    {
+      "id": "english2-random-49",
+      "subject": "english2",
+      "year": 0,
+      "number": 49,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "介词搭配",
+      "difficulty": "基础",
+      "stem": "She is good ___ mathematics.",
+      "options": [
+        {
+          "key": "A",
+          "text": "at"
+        },
+        {
+          "key": "B",
+          "text": "in"
+        },
+        {
+          "key": "C",
+          "text": "on"
+        },
+        {
+          "key": "D",
+          "text": "for"
+        }
+      ],
+      "answer": "A",
+      "explanation": "be good at表示“擅长”。"
+    },
+    {
+      "id": "english2-random-50",
+      "subject": "english2",
+      "year": 0,
+      "number": 50,
+      "type": "choice",
+      "chapter": "语法",
+      "topic": "宾语从句语序",
+      "difficulty": "提高",
+      "stem": "He asked me ___.",
+      "options": [
+        {
+          "key": "A",
+          "text": "where did I live"
+        },
+        {
+          "key": "B",
+          "text": "where I lived"
+        },
+        {
+          "key": "C",
+          "text": "where I live"
+        },
+        {
+          "key": "D",
+          "text": "where do I live"
+        }
+      ],
+      "answer": "B",
+      "explanation": "宾语从句用陈述语序，并与主句时态一致。"
+    },
+    {
+      "id": "english2-random-51",
+      "subject": "english2",
+      "year": 0,
+      "number": 51,
+      "type": "choice",
+      "chapter": "句型",
+      "topic": "强调句型",
+      "difficulty": "提高",
+      "stem": "It was John ___ broke the window.",
+      "options": [
+        {
+          "key": "A",
+          "text": "that"
+        },
+        {
+          "key": "B",
+          "text": "where"
+        },
+        {
+          "key": "C",
+          "text": "which"
+        },
+        {
+          "key": "D",
+          "text": "when"
+        }
+      ],
+      "answer": "A",
+      "explanation": "强调人时可用It was...that结构。"
+    },
+    {
+      "id": "english2-random-52",
+      "subject": "english2",
+      "year": 0,
+      "number": 52,
+      "type": "choice",
+      "chapter": "句型",
+      "topic": "Not until倒装",
+      "difficulty": "提高",
+      "stem": "Not until midnight ___ the work.",
+      "options": [
+        {
+          "key": "A",
+          "text": "he finished"
+        },
+        {
+          "key": "B",
+          "text": "did he finish"
+        },
+        {
+          "key": "C",
+          "text": "he did finish"
+        },
+        {
+          "key": "D",
+          "text": "finished he"
+        }
+      ],
+      "answer": "B",
+      "explanation": "Not until置于句首，主句部分倒装。"
+    },
+    {
+      "id": "english2-random-53",
+      "subject": "english2",
+      "year": 0,
+      "number": 53,
+      "type": "choice",
+      "chapter": "句型",
+      "topic": "so...that",
+      "difficulty": "基础",
+      "stem": "It was ___ cold that we stayed indoors.",
+      "options": [
+        {
+          "key": "A",
+          "text": "so"
+        },
+        {
+          "key": "B",
+          "text": "such"
+        },
+        {
+          "key": "C",
+          "text": "too"
+        },
+        {
+          "key": "D",
+          "text": "very"
+        }
+      ],
+      "answer": "A",
+      "explanation": "so修饰形容词cold，构成so...that。"
+    },
+    {
+      "id": "english2-random-54",
+      "subject": "english2",
+      "year": 0,
+      "number": 54,
+      "type": "choice",
+      "chapter": "句型",
+      "topic": "such...that",
+      "difficulty": "基础",
+      "stem": "It was ___ a good film that I saw it twice.",
+      "options": [
+        {
+          "key": "A",
+          "text": "so"
+        },
+        {
+          "key": "B",
+          "text": "such"
+        },
+        {
+          "key": "C",
+          "text": "too"
+        },
+        {
+          "key": "D",
+          "text": "very"
+        }
+      ],
+      "answer": "B",
+      "explanation": "such修饰名词短语a good film。"
+    },
+    {
+      "id": "english2-random-55",
+      "subject": "english2",
+      "year": 0,
+      "number": 55,
+      "type": "choice",
+      "chapter": "句型",
+      "topic": "Hardly...when",
+      "difficulty": "冲刺",
+      "stem": "Hardly had he arrived ___ it began to rain.",
+      "options": [
+        {
+          "key": "A",
+          "text": "than"
+        },
+        {
+          "key": "B",
+          "text": "when"
+        },
+        {
+          "key": "C",
+          "text": "then"
+        },
+        {
+          "key": "D",
+          "text": "while"
+        }
+      ],
+      "answer": "B",
+      "explanation": "Hardly...when表示“一……就……”。"
+    },
+    {
+      "id": "english2-random-56",
+      "subject": "english2",
+      "year": 0,
+      "number": 56,
+      "type": "choice",
+      "chapter": "句型",
+      "topic": "No sooner...than",
+      "difficulty": "冲刺",
+      "stem": "No sooner had she left ___ the phone rang.",
+      "options": [
+        {
+          "key": "A",
+          "text": "when"
+        },
+        {
+          "key": "B",
+          "text": "than"
+        },
+        {
+          "key": "C",
+          "text": "then"
+        },
+        {
+          "key": "D",
+          "text": "as"
+        }
+      ],
+      "answer": "B",
+      "explanation": "No sooner...than表示“刚……就……”。"
+    },
+    {
+      "id": "english2-random-57",
+      "subject": "english2",
+      "year": 0,
+      "number": 57,
+      "type": "choice",
+      "chapter": "句型",
+      "topic": "as...as",
+      "difficulty": "基础",
+      "stem": "She sings as ___ as her sister.",
+      "options": [
+        {
+          "key": "A",
+          "text": "good"
+        },
+        {
+          "key": "B",
+          "text": "well"
+        },
+        {
+          "key": "C",
+          "text": "better"
+        },
+        {
+          "key": "D",
+          "text": "best"
+        }
+      ],
+      "answer": "B",
+      "explanation": "修饰动词sings用副词well。"
+    },
+    {
+      "id": "english2-random-58",
+      "subject": "english2",
+      "year": 0,
+      "number": 58,
+      "type": "choice",
+      "chapter": "句型",
+      "topic": "too...to",
+      "difficulty": "提高",
+      "stem": "The box is too heavy for me ___.",
+      "options": [
+        {
+          "key": "A",
+          "text": "to lift"
+        },
+        {
+          "key": "B",
+          "text": "to be lifted"
+        },
+        {
+          "key": "C",
+          "text": "lifting"
+        },
+        {
+          "key": "D",
+          "text": "lift"
+        }
+      ],
+      "answer": "A",
+      "explanation": "too...to结构中不定式表示结果。"
+    },
+    {
+      "id": "english2-random-59",
+      "subject": "english2",
+      "year": 0,
+      "number": 59,
+      "type": "choice",
+      "chapter": "句型",
+      "topic": "unless引导条件",
+      "difficulty": "基础",
+      "stem": "You will fail ___ you work harder.",
+      "options": [
+        {
+          "key": "A",
+          "text": "unless"
+        },
+        {
+          "key": "B",
+          "text": "if"
+        },
+        {
+          "key": "C",
+          "text": "because"
+        },
+        {
+          "key": "D",
+          "text": "though"
+        }
+      ],
+      "answer": "A",
+      "explanation": "unless表示“除非”。"
+    },
+    {
+      "id": "english2-random-60",
+      "subject": "english2",
+      "year": 0,
+      "number": 60,
+      "type": "choice",
+      "chapter": "句型",
+      "topic": "provided that",
+      "difficulty": "提高",
+      "stem": "You can go out ___ you finish your homework.",
+      "options": [
+        {
+          "key": "A",
+          "text": "provided that"
+        },
+        {
+          "key": "B",
+          "text": "despite"
+        },
+        {
+          "key": "C",
+          "text": "although"
+        },
+        {
+          "key": "D",
+          "text": "unless"
+        }
+      ],
+      "answer": "A",
+      "explanation": "provided that表示“只要”。"
+    }
+  ]
+}

@@ -1,0 +1,797 @@
+{
+  "year": 2027,
+  "updatedAt": "2026-11-23",
+  "note": "依据 2027 考研数学二、英语二、政治、408 考试大纲整理；大纲原文见同目录 *-2027.md。",
+  "subjects": [
+    {
+      "id": "math2",
+      "name": "数学（二）",
+      "short": "数二",
+      "code": "302",
+      "accent": "#315e4c",
+      "duration": 180,
+      "totalScore": 150,
+      "description": "高等数学约 80%，线性代数约 20%。不考概率论、无穷级数、曲线曲面积分、三重积分。",
+      "structure": [
+        {
+          "type": "choice",
+          "name": "单项选择题",
+          "count": 10,
+          "score": 5
+        },
+        {
+          "type": "fill",
+          "name": "填空题",
+          "count": 6,
+          "score": 5
+        },
+        {
+          "type": "solution",
+          "name": "解答题",
+          "count": 6,
+          "score": 0
+        }
+      ],
+      "highlights": [
+        "2027 大纲框架稳定，数二仍不考概率论",
+        "高等数学约 80%、线性代数约 20%",
+        "定积分应用强调几何量与物理量（功、引力、压力、质心等）",
+        "解答题重计算步骤与证明规范"
+      ],
+      "chapters": [
+        {
+          "id": "math2-calculus",
+          "name": "高等数学",
+          "children": [
+            {
+              "id": "math2-limits",
+              "name": "函数、极限、连续",
+              "weight": 12
+            },
+            {
+              "id": "math2-diff",
+              "name": "一元函数微分学",
+              "weight": 24
+            },
+            {
+              "id": "math2-int",
+              "name": "一元函数积分学",
+              "weight": 20
+            },
+            {
+              "id": "math2-multivar",
+              "name": "多元函数微积分学",
+              "weight": 14
+            },
+            {
+              "id": "math2-ode",
+              "name": "常微分方程",
+              "weight": 10
+            }
+          ]
+        },
+        {
+          "id": "math2-linear",
+          "name": "线性代数",
+          "children": [
+            {
+              "id": "math2-det",
+              "name": "行列式",
+              "weight": 2
+            },
+            {
+              "id": "math2-matrix",
+              "name": "矩阵",
+              "weight": 4
+            },
+            {
+              "id": "math2-vector",
+              "name": "向量",
+              "weight": 3
+            },
+            {
+              "id": "math2-system",
+              "name": "线性方程组",
+              "weight": 3
+            },
+            {
+              "id": "math2-eigen",
+              "name": "特征值与特征向量",
+              "weight": 5
+            },
+            {
+              "id": "math2-quadratic",
+              "name": "二次型",
+              "weight": 3
+            }
+          ]
+        }
+      ],
+      "modes": [
+        {
+          "id": "quick",
+          "name": "快速一组",
+          "description": "适合碎片时间，覆盖选择、填空、解答三种题型",
+          "minutes": 45,
+          "plan": [
+            {
+              "type": "choice",
+              "name": "选择题",
+              "count": 4,
+              "score": 5
+            },
+            {
+              "type": "fill",
+              "name": "填空题",
+              "count": 2,
+              "score": 5
+            },
+            {
+              "type": "solution",
+              "name": "解答题",
+              "count": 2,
+              "score": 10
+            }
+          ]
+        },
+        {
+          "id": "standard",
+          "name": "整卷模考",
+          "description": "按 2027 真题结构生成 22 题整卷",
+          "minutes": 180,
+          "plan": [
+            {
+              "type": "choice",
+              "name": "选择题",
+              "count": 10,
+              "score": 5
+            },
+            {
+              "type": "fill",
+              "name": "填空题",
+              "count": 6,
+              "score": 5
+            },
+            {
+              "type": "solution",
+              "name": "解答题",
+              "count": 6,
+              "score": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "english2",
+      "name": "英语（二）",
+      "short": "英二",
+      "code": "204",
+      "accent": "#8a5a2b",
+      "duration": 180,
+      "totalScore": 100,
+      "description": "完形 10 分、阅读 40 分、新题型 10 分、翻译 15 分、写作 25 分。",
+      "structure": [
+        {
+          "type": "cloze",
+          "name": "完形填空",
+          "count": 20,
+          "score": 0.5
+        },
+        {
+          "type": "reading",
+          "name": "阅读理解 A",
+          "count": 20,
+          "score": 2
+        },
+        {
+          "type": "newtype",
+          "name": "阅读理解 B（新题型）",
+          "count": 5,
+          "score": 2
+        },
+        {
+          "type": "translation",
+          "name": "英译汉",
+          "count": 1,
+          "score": 15
+        },
+        {
+          "type": "writing",
+          "name": "写作",
+          "count": 2,
+          "score": 0
+        }
+      ],
+      "highlights": [
+        "2027 英语二大纲题型、分值无实质变化",
+        "阅读 A 节 4 篇、每篇 5 题，是 40 分主战场",
+        "新题型为匹配或小标题二选一",
+        "翻译为约 150 词段落英译汉；写作含应用文 10 分 + 图表/文字短文 15 分"
+      ],
+      "chapters": [
+        {
+          "id": "english2-cloze",
+          "name": "完形填空",
+          "weight": 10
+        },
+        {
+          "id": "english2-reading",
+          "name": "阅读理解 A",
+          "weight": 40
+        },
+        {
+          "id": "english2-newtype",
+          "name": "新题型",
+          "weight": 10
+        },
+        {
+          "id": "english2-translation",
+          "name": "翻译",
+          "weight": 15
+        },
+        {
+          "id": "english2-writing",
+          "name": "写作",
+          "weight": 25
+        }
+      ],
+      "modes": [
+        {
+          "id": "reading",
+          "name": "阅读一篇",
+          "description": "1 篇约 400 词文章 + 5 道题",
+          "minutes": 20,
+          "plan": [
+            {
+              "type": "reading",
+              "name": "阅读理解",
+              "count": 5,
+              "score": 2
+            }
+          ]
+        },
+        {
+          "id": "cloze",
+          "name": "完形一组",
+          "description": "1 篇完形，10 个空",
+          "minutes": 15,
+          "plan": [
+            {
+              "type": "cloze",
+              "name": "完形填空",
+              "count": 10,
+              "score": 0.5
+            }
+          ]
+        },
+        {
+          "id": "translation",
+          "name": "翻译一段",
+          "description": "1 段约 150 词英译汉",
+          "minutes": 20,
+          "plan": [
+            {
+              "type": "translation",
+              "name": "翻译",
+              "count": 1,
+              "score": 15
+            }
+          ]
+        },
+        {
+          "id": "writing",
+          "name": "写作一篇",
+          "description": "应用文或图表短文",
+          "minutes": 30,
+          "plan": [
+            {
+              "type": "writing",
+              "name": "写作",
+              "count": 1,
+              "score": 15
+            }
+          ]
+        },
+        {
+          "id": "half",
+          "name": "半卷训练",
+          "description": "完形 10 空 + 阅读 1 篇 + 新题型 5 题 + 翻译 1 段",
+          "minutes": 75,
+          "plan": [
+            {
+              "type": "cloze",
+              "name": "完形填空",
+              "count": 10,
+              "score": 0.5
+            },
+            {
+              "type": "reading",
+              "name": "阅读理解",
+              "count": 5,
+              "score": 2
+            },
+            {
+              "type": "newtype",
+              "name": "新题型",
+              "count": 5,
+              "score": 2
+            },
+            {
+              "type": "translation",
+              "name": "翻译",
+              "count": 1,
+              "score": 15
+            }
+          ]
+        },
+        {
+          "id": "full",
+          "name": "整卷模考",
+          "description": "按 2027 结构生成 48 题完整试卷（生成耗时较长）",
+          "minutes": 180,
+          "plan": [
+            {
+              "type": "cloze",
+              "name": "完形填空",
+              "count": 20,
+              "score": 0.5
+            },
+            {
+              "type": "reading",
+              "name": "阅读理解",
+              "count": 20,
+              "score": 2
+            },
+            {
+              "type": "newtype",
+              "name": "新题型",
+              "count": 5,
+              "score": 2
+            },
+            {
+              "type": "translation",
+              "name": "翻译",
+              "count": 1,
+              "score": 15
+            },
+            {
+              "type": "writing",
+              "name": "写作",
+              "count": 2,
+              "score": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "politics",
+      "name": "思想政治理论",
+      "short": "政治",
+      "code": "101",
+      "accent": "#9b3d2c",
+      "duration": 180,
+      "totalScore": 100,
+      "description": "马原 22%、毛中特 13%、新思想 22%、史纲 15%、思法 15%、时政与当代 13%。",
+      "structure": [
+        {
+          "type": "single",
+          "name": "单项选择题",
+          "count": 16,
+          "score": 1
+        },
+        {
+          "type": "multiple",
+          "name": "多项选择题",
+          "count": 17,
+          "score": 2
+        },
+        {
+          "type": "analysis",
+          "name": "材料分析题",
+          "count": 5,
+          "score": 10
+        }
+      ],
+      "highlights": [
+        "2027 大纲变动集中在毛中特（含新思想）与时政",
+        "新增/强化中国式现代化、高质量发展、新质生产力、共同富裕等表述",
+        "时政范围更新为 2026 年 1—12 月国内外重大时事",
+        "题型分值不变：单选 16 + 多选 17 + 分析 5"
+      ],
+      "chapters": [
+        {
+          "id": "politics-mayuan",
+          "name": "马克思主义基本原理",
+          "weight": 22,
+          "children": [
+            {
+              "id": "politics-mayuan-philo",
+              "name": "辩证唯物主义与认识论"
+            },
+            {
+              "id": "politics-mayuan-history",
+              "name": "唯物史观"
+            },
+            {
+              "id": "politics-mayuan-capital",
+              "name": "资本主义与政治经济学"
+            },
+            {
+              "id": "politics-mayuan-socialism",
+              "name": "社会主义与共产主义"
+            }
+          ]
+        },
+        {
+          "id": "politics-mao",
+          "name": "毛泽东思想和中国特色社会主义理论体系概论",
+          "weight": 13,
+          "children": [
+            {
+              "id": "politics-mao-newdemo",
+              "name": "新民主主义革命理论"
+            },
+            {
+              "id": "politics-mao-transform",
+              "name": "社会主义改造理论"
+            },
+            {
+              "id": "politics-mao-explore",
+              "name": "社会主义建设道路探索"
+            },
+            {
+              "id": "politics-mao-deng",
+              "name": "邓小平理论、“三个代表”、科学发展观"
+            }
+          ]
+        },
+        {
+          "id": "politics-xi",
+          "name": "习近平新时代中国特色社会主义思想概论",
+          "weight": 22,
+          "children": [
+            {
+              "id": "politics-xi-modern",
+              "name": "中国式现代化"
+            },
+            {
+              "id": "politics-xi-quality",
+              "name": "高质量发展与新质生产力"
+            },
+            {
+              "id": "politics-xi-reform",
+              "name": "全面深化改革开放"
+            },
+            {
+              "id": "politics-xi-people",
+              "name": "全过程人民民主与依法治国"
+            },
+            {
+              "id": "politics-xi-culture",
+              "name": "文化自信与共同富裕"
+            },
+            {
+              "id": "politics-xi-ecology",
+              "name": "生态文明与国家安全"
+            },
+            {
+              "id": "politics-xi-world",
+              "name": "中国特色大国外交与党建"
+            }
+          ]
+        },
+        {
+          "id": "politics-history",
+          "name": "中国近现代史纲要",
+          "weight": 15,
+          "children": [
+            {
+              "id": "politics-history-modern",
+              "name": "近代史与旧民主主义革命"
+            },
+            {
+              "id": "politics-history-new",
+              "name": "新民主主义革命"
+            },
+            {
+              "id": "politics-history-build",
+              "name": "社会主义革命和建设"
+            },
+            {
+              "id": "politics-history-reform",
+              "name": "改革开放与新时代"
+            }
+          ]
+        },
+        {
+          "id": "politics-ethics",
+          "name": "思想道德与法治",
+          "weight": 15,
+          "children": [
+            {
+              "id": "politics-ethics-life",
+              "name": "人生观与理想信念"
+            },
+            {
+              "id": "politics-ethics-spirit",
+              "name": "中国精神与核心价值观"
+            },
+            {
+              "id": "politics-ethics-morality",
+              "name": "道德"
+            },
+            {
+              "id": "politics-ethics-law",
+              "name": "法治"
+            }
+          ]
+        },
+        {
+          "id": "politics-current",
+          "name": "形势与政策及当代世界经济与政治",
+          "weight": 13,
+          "children": [
+            {
+              "id": "politics-current-2026",
+              "name": "2026 年度时政"
+            },
+            {
+              "id": "politics-current-world",
+              "name": "当代世界经济与政治"
+            }
+          ]
+        }
+      ],
+      "modes": [
+        {
+          "id": "quick",
+          "name": "快速一组",
+          "description": "6 道单选 + 3 道多选 + 1 道材料分析",
+          "minutes": 35,
+          "plan": [
+            {
+              "type": "single",
+              "name": "单项选择题",
+              "count": 6,
+              "score": 1
+            },
+            {
+              "type": "multiple",
+              "name": "多项选择题",
+              "count": 3,
+              "score": 2
+            },
+            {
+              "type": "analysis",
+              "name": "材料分析题",
+              "count": 1,
+              "score": 10
+            }
+          ]
+        },
+        {
+          "id": "standard",
+          "name": "整卷模考",
+          "description": "按 2027 结构生成 38 题整卷",
+          "minutes": 180,
+          "plan": [
+            {
+              "type": "single",
+              "name": "单项选择题",
+              "count": 16,
+              "score": 1
+            },
+            {
+              "type": "multiple",
+              "name": "多项选择题",
+              "count": 17,
+              "score": 2
+            },
+            {
+              "type": "analysis",
+              "name": "材料分析题",
+              "count": 5,
+              "score": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cs408",
+      "name": "计算机学科专业基础",
+      "short": "408",
+      "code": "408",
+      "accent": "#3f5f7a",
+      "duration": 180,
+      "totalScore": 150,
+      "description": "数据结构 45、计算机组成原理 45、操作系统 35、计算机网络 25；40 道单选 + 7 道综合应用。",
+      "structure": [
+        {
+          "type": "choice",
+          "name": "单项选择题",
+          "count": 40,
+          "score": 2
+        },
+        {
+          "type": "comprehensive",
+          "name": "综合应用题",
+          "count": 7,
+          "score": 0
+        }
+      ],
+      "highlights": [
+        "2027 408 大纲与 2026 版保持一致",
+        "数据结构 45、计组 45、操作系统 35、网络 25",
+        "单选 40 题 80 分，综合应用 7 题 70 分",
+        "综合题重算法设计、地址计算、PV 操作、组网与路由"
+      ],
+      "chapters": [
+        {
+          "id": "cs408-ds",
+          "name": "数据结构",
+          "weight": 45,
+          "children": [
+            {
+              "id": "cs408-ds-list",
+              "name": "线性表"
+            },
+            {
+              "id": "cs408-ds-stack",
+              "name": "栈、队列和数组"
+            },
+            {
+              "id": "cs408-ds-tree",
+              "name": "树与二叉树"
+            },
+            {
+              "id": "cs408-ds-graph",
+              "name": "图"
+            },
+            {
+              "id": "cs408-ds-search",
+              "name": "查找"
+            },
+            {
+              "id": "cs408-ds-sort",
+              "name": "排序"
+            }
+          ]
+        },
+        {
+          "id": "cs408-co",
+          "name": "计算机组成原理",
+          "weight": 45,
+          "children": [
+            {
+              "id": "cs408-co-intro",
+              "name": "计算机系统概述"
+            },
+            {
+              "id": "cs408-co-data",
+              "name": "数据的表示和运算"
+            },
+            {
+              "id": "cs408-co-memory",
+              "name": "存储器层次结构"
+            },
+            {
+              "id": "cs408-co-isa",
+              "name": "指令系统"
+            },
+            {
+              "id": "cs408-co-cpu",
+              "name": "中央处理器"
+            },
+            {
+              "id": "cs408-co-bus",
+              "name": "总线与输入输出系统"
+            }
+          ]
+        },
+        {
+          "id": "cs408-os",
+          "name": "操作系统",
+          "weight": 35,
+          "children": [
+            {
+              "id": "cs408-os-intro",
+              "name": "操作系统概述"
+            },
+            {
+              "id": "cs408-os-process",
+              "name": "进程管理"
+            },
+            {
+              "id": "cs408-os-memory",
+              "name": "内存管理"
+            },
+            {
+              "id": "cs408-os-file",
+              "name": "文件管理"
+            },
+            {
+              "id": "cs408-os-io",
+              "name": "输入输出管理"
+            }
+          ]
+        },
+        {
+          "id": "cs408-net",
+          "name": "计算机网络",
+          "weight": 25,
+          "children": [
+            {
+              "id": "cs408-net-arch",
+              "name": "体系结构"
+            },
+            {
+              "id": "cs408-net-phys",
+              "name": "物理层"
+            },
+            {
+              "id": "cs408-net-link",
+              "name": "数据链路层"
+            },
+            {
+              "id": "cs408-net-network",
+              "name": "网络层"
+            },
+            {
+              "id": "cs408-net-transport",
+              "name": "传输层"
+            },
+            {
+              "id": "cs408-net-app",
+              "name": "应用层"
+            }
+          ]
+        }
+      ],
+      "modes": [
+        {
+          "id": "quick",
+          "name": "快速一组",
+          "description": "10 道单选 + 2 道综合应用",
+          "minutes": 50,
+          "plan": [
+            {
+              "type": "choice",
+              "name": "单项选择题",
+              "count": 10,
+              "score": 2
+            },
+            {
+              "type": "comprehensive",
+              "name": "综合应用题",
+              "count": 2,
+              "score": 10
+            }
+          ]
+        },
+        {
+          "id": "standard",
+          "name": "整卷模考",
+          "description": "按 2027 结构生成 47 题整卷",
+          "minutes": 180,
+          "plan": [
+            {
+              "type": "choice",
+              "name": "单项选择题",
+              "count": 40,
+              "score": 2
+            },
+            {
+              "type": "comprehensive",
+              "name": "综合应用题",
+              "count": 7,
+              "score": 10
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

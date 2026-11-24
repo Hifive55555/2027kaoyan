@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-paper: #f6f3ec;
+  --color-paper-2: #f3efe6;
+  --color-surface: #fffdf8;
+  --color-surface-2: #fbf8f1;
+  --color-surface-3: #faf7f0;
+  --color-ink: #1f1d19;
+  --color-muted: #756f63;
+  --color-faint: #9b9384;
+  --color-line: #e4ddcf;
+  --color-line-strong: #cfc5b2;
+  --color-hover: #ece7dc;
+  --color-sand: #f6f2e9;
+  --color-subtle: #f0ece3;
+  --color-track: #e7e0d2;
+  --color-brand: #315e4c;
+  --color-brand-soft: #e7efe9;
+  --color-accent: #b4492f;
+  --color-accent-soft: #f7e9e4;
+  --color-amber: #8a5a2b;
+  --color-amber-soft: #f3ecdf;
+  --color-blue: #3f5f7a;
+  --color-blue-soft: #e9eef2;
+  --font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-serif: "Noto Serif SC", "Songti SC", "Source Han Serif SC", Georgia, serif;
+}
+
+.dark {
+  color-scheme: dark;
+  --color-paper: #121210;
+  --color-paper-2: #171613;
+  --color-surface: #1b1a17;
+  --color-surface-2: #21201c;
+  --color-surface-3: #24231e;
+  --color-ink: #ece7dc;
+  --color-muted: #aba396;
+  --color-faint: #837c70;
+  --color-line: #302e28;
+  --color-line-strong: #49453d;
+  --color-hover: #2b2923;
+  --color-sand: #24221d;
+  --color-subtle: #2a2721;
+  --color-track: #34312a;
+  --color-brand: #9cc0a9;
+  --color-brand-soft: #20352a;
+  --color-accent: #e58b72;
+  --color-accent-soft: #3a241f;
+  --color-amber: #d3a763;
+  --color-amber-soft: #342a1b;
+  --color-blue: #9bb8d1;
+  --color-blue-soft: #1f2b34;
+}
+
+html { background: var(--color-paper); color-scheme: light; }
+.dark html, html.dark { color-scheme: dark; }
+body { background: var(--color-paper); color: var(--color-ink); transition: background-color 0.2s ease, color 0.2s ease; }
+::selection { background: var(--color-brand-soft); }
+
+* { border-color: var(--color-line); }
+button, a { -webkit-tap-highlight-color: transparent; }
+
+.md-body { font-size: 15px; line-height: 1.85; color: var(--color-ink); overflow-wrap: anywhere; }
+.md-body > *:first-child { margin-top: 0 !important; }
+.md-body > *:last-child { margin-bottom: 0 !important; }
+.md-body p { margin: 0.75rem 0; }
+.md-body h1, .md-body h2, .md-body h3, .md-body h4 { font-family: var(--font-serif); font-weight: 600; line-height: 1.4; margin: 1.4rem 0 0.6rem; }
+.md-body h1 { font-size: 1.4rem; }
+.md-body h2 { font-size: 1.18rem; }
+.md-body h3 { font-size: 1.05rem; }
+.md-body ul, .md-body ol { margin: 0.6rem 0; padding-left: 1.35rem; }
+.md-body ul { list-style: disc; }
+.md-body ol { list-style: decimal; }
+.md-body li { margin: 0.22rem 0; }
+.md-body blockquote { margin: 0.9rem 0; border-left: 2px solid var(--color-line-strong); padding-left: 0.9rem; color: var(--color-muted); }
+.md-body hr { margin: 1.5rem 0; border-top: 1px solid var(--color-line); }
+.md-body table { width: 100%; border-collapse: collapse; font-size: 0.86em; }
+.md-body th, .md-body td { border-bottom: 1px solid var(--color-line); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+.md-body th { background: var(--color-sand); font-weight: 600; }
+.md-body tr:last-child td { border-bottom: 0; }
+.md-body pre { margin: 0.9rem 0; border-radius: 0.6rem; background: #23211d; color: #efeadd; padding: 0.85rem 1rem; overflow-x: auto; font-size: 0.82em; line-height: 1.65; }
+.md-body pre code { background: transparent; padding: 0; color: inherit; font-size: inherit; }
+.md-body strong { font-weight: 650; }
+.md-body .katex-display { margin: 0.9rem 0; overflow-x: auto; overflow-y: hidden; padding: 0.15rem 0; }
+.md-body .katex { font-size: 1.02em; }
+.md-body img { max-width: 100%; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@keyframes yt-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.animate-rise { animation: yt-rise 0.45s ease-out both; }
+@keyframes yt-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+.animate-soft-pulse { animation: yt-pulse 1.6s ease-in-out infinite; }
