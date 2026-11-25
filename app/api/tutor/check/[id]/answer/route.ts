@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireUserApi } from "@/lib/auth";
-import { getTutorCheck, getTutorCheckRaw, saveTutorCheckAttempt, saveTutorMessage, getTutorConversation, getTutorConversationForCheck, getOrCreateActiveTutorConversation } from "@/lib/queries";
+import { getTutorCheck, getTutorCheckRaw, saveTutorCheckAttempt, saveTutorMessage, getTutorConversation, getTutorConversationForCheck, getOrCreateActiveTutorConversation, getTutorMessages } from "@/lib/queries";
 import { judgeTutorCheckAnswer } from "@/lib/tutor-judge";
 
 export const runtime = "nodejs";
@@ -18,15 +18,27 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const body = await req.json().catch(() => ({}));
     const response = String(body.response || "").trim().slice(0, 300);
     if (!response) return Response.json({ error: "请先作答" }, { status: 400 });
+    const conversationId = getTutorConversationForCheck(auth.userId, id) || getOrCreateActiveTutorConversation(auth.userId).id;
+    const conversation = getTutorConversation(auth.userId, conversationId);
+    if (!conversation || conversation.archivedAt) return Response.json({ error: "对话不存在或已归档" }, { status: 409 });
     const expected = String(check.answer || "").trim();
-    const correct = check.kind === "yesno"
-      ? (expected ? response.toLowerCase().trim() === expected.toLowerCase().trim() : null)
-      : await judgeTutorCheckAnswer({ prompt: check.prompt, expected, response });
+    const recent = getTutorMessages(auth.userId, conversationId).filter(m => m.role !== "system" && m.content.trim()).slice(-8);
+    const context = recent.map(m => `${m.role === "user" ? "学生" : "老师"}：${m.content.replace(/\s+/g, " ").slice(0, 500)}`).join("\n");
+    let correct: boolean | null = null;
+    if (check.kind === "yesno") {
+      correct = expected ? response.toLowerCase().trim() === expected.toLowerCase().trim() : null;
+    } else {
+      try {
+        correct = await judgeTutorCheckAnswer({ prompt: check.prompt, expected, response, context });
+      } catch (err) {
+        // Do not turn a judging-model failure into a wrong answer. Keep the
+        // attempt unjudged and let the teacher interpret it.
+        console.error("[tutor] fill check judge failed:", err);
+      }
+    }
     saveTutorCheckAttempt(auth.userId, id, response, correct);
     const label = check.prompt.length > 48 ? `${check.prompt.slice(0, 48)}…` : check.prompt;
-    const outcome = correct === null ? "" : correct ? "（正确）" : "（与预期不同）";
-    const conversationId = getTutorConversationForCheck(auth.userId, id) || getOrCreateActiveTutorConversation(auth.userId).id;
-    if (getTutorConversation(auth.userId, conversationId)?.archivedAt) return Response.json({ error: "对话已归档，请先取消归档" }, { status: 409 });
+    const outcome = correct === null ? "（未判定）" : correct ? "（正确）" : "（与预期不同）";
     const systemMessage = saveTutorMessage(
       auth.userId,
       conversationId,
