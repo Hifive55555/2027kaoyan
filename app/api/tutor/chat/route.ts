@@ -166,6 +166,10 @@ export async function POST(req: NextRequest) {
 结果：${quiz.attempt.correct ? "答对" : "答错"}
 请根据这个结果自行决定下一步：可以简短确认后推进新内容、继续追问，或直接出下一题；如果答错，先针对错误引导。不要提及“系统事件”，也不要假装学生用文字说过这些话。`,
       });
+      // DeepSeek rejects a request whose last non-system message is an
+      // assistant turn. The event above is system-only, so add a hidden user
+      // turn to make this a normal continuation. It is not persisted.
+      messages.push({ role: "user", content: "请根据上面的系统事件继续教学。" });
       return streamTutorReply({
         userId: auth.userId,
         conversationId: conversation.id,
@@ -197,6 +201,7 @@ export async function POST(req: NextRequest) {
 学生回答：${check.attempt.response}${expected}
 请根据回答自行决定下一步：可以确认后继续讲、追问原因，或直接推进/出题；如果回答不对，先给一个提示。不要提及“系统事件”，也不要假装学生用文字说过这些话。`,
       });
+      messages.push({ role: "user", content: "请根据上面的系统事件继续教学。" });
       return streamTutorReply({
         userId: auth.userId,
         conversationId: conversation.id,
