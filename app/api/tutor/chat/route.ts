@@ -3,6 +3,7 @@ import { requireUserApi } from "@/lib/auth";
 import { streamChat, type ChatMessageInput } from "@/lib/deepseek";
 import { buildTutorMessages } from "@/lib/prompts";
 import { buildLearnerProfile, toLearnerPrompt } from "@/lib/learner";
+import { getTutorRetrievalContext } from "@/lib/tutor-retrieval";
 import { extractTutorCheck, extractTutorRoadmap, limitTutorReply } from "@/lib/tutor";
 import { generateTutorQuizMessage } from "@/lib/tutor-service";
 import {
@@ -33,6 +34,21 @@ function finalizeTutorReply(userId: string, full: string, fallback: string) {
   return { reply, checkId, roadmap, markerQuiz, implicitQuiz };
 }
 
+function formatSources(annotations: any[]): string {
+  const seen = new Set<string>();
+  const rows: string[] = [];
+  for (const item of annotations) {
+    const c = item?.url_citation || item;
+    const url = String(c?.url || "");
+    const title = String(c?.title || url).replace(/[\[\]]/g, "").slice(0, 100);
+    if (!/^https?:\/\//.test(url) || seen.has(url)) continue;
+    seen.add(url);
+    rows.push(`- [${title}](${url})`);
+    if (rows.length >= 4) break;
+  }
+  return rows.length ? `\n\n参考来源：\n${rows.join("\n")}` : "";
+}
+
 function streamTutorReply(input: {
   userId: string;
   messages: ChatMessageInput[];
@@ -49,6 +65,7 @@ function streamTutorReply(input: {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
         } catch { /* client disconnected */ }
       };
+      let sources: any[] = [];
       try {
         await streamChat(input.messages, delta => {
           full += delta;
@@ -57,10 +74,11 @@ function streamTutorReply(input: {
           // the final `done` event replaces the temporary message with the
           // cleaned, persisted message.
           send({ delta });
-        }, { maxTokens: 3000, temperature: 0.55, effort: "high" });
+        }, { maxTokens: 3000, temperature: 0.55, effort: "high", webSearch: true, onMeta: meta => { sources = meta.annotations; } });
 
         const finalized = finalizeTutorReply(input.userId, full, input.fallback);
-        const assistant = saveTutorMessage(input.userId, "assistant", finalized.reply, undefined, finalized.checkId);
+        const replyWithSources = finalized.reply + formatSources(sources);
+        const assistant = saveTutorMessage(input.userId, "assistant", replyWithSources, undefined, finalized.checkId);
         let quizMessage = null;
 
         const wantsQuiz = !finalized.checkId && (finalized.markerQuiz || input.explicitQuiz || finalized.implicitQuiz);
@@ -116,7 +134,12 @@ export async function POST(req: NextRequest) {
       if (!quiz || !quiz.attempt) return Response.json({ error: "答题记录不存在" }, { status: 404 });
       const history = getTutorMessages(auth.userId, 80).map(m => ({ role: m.role, content: m.content }));
       const profile = buildLearnerProfile(auth.userId);
-      const messages = buildTutorMessages({ profileText: toLearnerPrompt(profile), roadmapText: getTutorRoadmapText(auth.userId), history });
+      const messages = buildTutorMessages({
+        profileText: toLearnerPrompt(profile),
+        roadmapText: getTutorRoadmapText(auth.userId),
+        retrievalText: getTutorRetrievalContext(auth.userId, `${quiz.stem} ${quiz.topic} ${quiz.chapter}`),
+        history,
+      });
       messages.push({
         role: "system" as const,
         content: `【系统事件】学生刚刚完成了你出的巩固题。
@@ -140,7 +163,12 @@ export async function POST(req: NextRequest) {
       if (!check || !check.attempt) return Response.json({ error: "检查记录不存在" }, { status: 404 });
       const history = getTutorMessages(auth.userId, 80).map(m => ({ role: m.role, content: m.content }));
       const profile = buildLearnerProfile(auth.userId);
-      const messages = buildTutorMessages({ profileText: toLearnerPrompt(profile), roadmapText: getTutorRoadmapText(auth.userId), history });
+      const messages = buildTutorMessages({
+        profileText: toLearnerPrompt(profile),
+        roadmapText: getTutorRoadmapText(auth.userId),
+        retrievalText: getTutorRetrievalContext(auth.userId, `${check.prompt} ${check.answer}`),
+        history,
+      });
       const expected = check.answer ? `\n预期答案：${check.answer}\n结果：${check.attempt.correct === null ? "未判定" : check.attempt.correct ? "答对" : "答错"}` : "";
       messages.push({
         role: "system" as const,
@@ -165,6 +193,7 @@ export async function POST(req: NextRequest) {
     const messages = buildTutorMessages({
       profileText: toLearnerPrompt(profile),
       roadmapText: getTutorRoadmapText(auth.userId),
+      retrievalText: getTutorRetrievalContext(auth.userId, message),
       history,
     });
     const explicitQuiz = /出题|来一道|练一题|做一道题/.test(message)

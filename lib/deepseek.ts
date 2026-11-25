@@ -2,6 +2,9 @@ const BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
 const MODEL = process.env.DEEPSEEK_MODEL || "deepseek-flash";
 const EFFORT = process.env.DEEPSEEK_EFFORT || "low";
 export type ReasoningEffort = "low" | "medium" | "high" | "max";
+export interface StreamMeta {
+  annotations: any[];
+}
 
 export interface ChatMessageInput {
   role: "system" | "user" | "assistant";
@@ -97,13 +100,14 @@ export function parseJsonLoose<T>(text: string): T {
 export async function streamChat(
   messages: ChatMessageInput[],
   onDelta: (delta: string) => void,
-  opts: { maxTokens?: number; temperature?: number; signal?: AbortSignal; effort?: ReasoningEffort } = {}
+  opts: { maxTokens?: number; temperature?: number; signal?: AbortSignal; effort?: ReasoningEffort; webSearch?: boolean; onMeta?: (meta: StreamMeta) => void } = {}
 ): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.maxTokens && opts.maxTokens > 8000 ? 240000 : 120000);
   const onAbort = () => controller.abort();
   opts.signal?.addEventListener("abort", onAbort);
   let full = "";
+  const annotations: any[] = [];
   try {
     const res = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
@@ -119,6 +123,7 @@ export async function streamChat(
         max_tokens: opts.maxTokens ?? 4000,
         reasoning_effort: opts.effort ?? EFFORT,
         stream: true,
+        ...(opts.webSearch ? { tools: [{ type: "deepseek_web_search", name: "deepseek_web_search" }] } : {}),
       }),
     });
     if (!res.ok || !res.body) {
@@ -141,11 +146,14 @@ export async function streamChat(
         if (!payload || payload === "[DONE]") continue;
         try {
           const json = JSON.parse(payload);
-          const delta = json.choices?.[0]?.delta?.content || "";
+          const rawDelta = json.choices?.[0]?.delta;
+          if (Array.isArray(rawDelta?.annotations)) annotations.push(...rawDelta.annotations);
+          const delta = rawDelta?.content || "";
           if (delta) { full += delta; onDelta(delta); }
         } catch { /* ignore keepalive */ }
       }
     }
+    opts.onMeta?.({ annotations });
     return full;
   } finally {
     clearTimeout(timer);

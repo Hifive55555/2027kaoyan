@@ -14,6 +14,7 @@
 - **做同类题**：针对刚做过的题，生成同章节、同题型、同难度的新题并追加到当前试卷。
 - **追问模式**：围绕一道题持续对话，问“为什么”“还有别的方法吗”“这个考点还会怎么考”。
 - **AI 答疑**：独立答疑页，老师先读学习档案，再按“小步引导 → 检查理解 → 出题巩固”的节奏推进；回复默认短、一次只问一个点，支持快速判断卡和填空卡，答完自动继续。
+- **资料检索**：每次答疑自动检索本地题库、2027 大纲；需要最新或外部信息时使用 DeepSeek 的 `deepseek_web_search` 联网搜索，并附参考来源。
 - **全局学习档案**：把试卷作答、随机刷题、1v1、答疑出题合并成 `LearnerProfile`，每次答疑自动注入；同时写入 `data/learner/<userId>.json` 方便检查。
 - **学习路线**：老师在答疑中维护分级的待办清单（待学/进行中/完成），用户可在右侧查看并勾选完成，下一轮自动带入。
 - **双用户**：`hifive` 与 `study` 两个账号，练习、错题、随机刷题、比赛记录互相隔离。
@@ -69,7 +70,8 @@ app/                     Next.js App Router 页面与 API
   settings/              模型与数据状态
   api/                   papers / grade / skip / chat / random / tutor / similar / uploads
 components/              界面组件（含 Markdown + KaTeX、追问面板）
-lib/                     DB、DeepSeek、提示词、检索、学习档案、数据访问
+lib/                     DB、DeepSeek、提示词、题库/大纲检索、学习档案、数据访问
+  tutor-retrieval.ts     本地题库 + 大纲自动检索（注入答疑上下文）
 data/
   bank/                  结构化题库（JSON，供检索/统计）
   corpus/                真题 Markdown（供阅读/AI 检索）
