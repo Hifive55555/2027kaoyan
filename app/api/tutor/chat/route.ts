@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
       // DeepSeek rejects a request whose last non-system message is an
       // assistant turn. The event above is system-only, so add a hidden user
       // turn to make this a normal continuation. It is not persisted.
-      messages.push({ role: "user", content: "请根据上面的系统事件继续教学。" });
+      messages.push({ role: "user", content: `（系统事件，不要提及系统事件本身）本轮学生完成的是这次巩固题：「${quiz.stem}」，选择「${quiz.attempt.answer}」，正确答案「${quiz.answer}」，结果「${quiz.attempt.correct ? "答对" : "答错"}」。请只针对这次答题继续，不要重复你上一条消息里已经处理过的旧检查。` });
       return streamTutorReply({
         userId: auth.userId,
         conversationId: conversation.id,
@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
 学生回答：${check.attempt.response}${expected}
 请根据回答自行决定下一步：可以确认后继续讲、追问原因，或直接推进/出题；如果回答不对，先给一个提示。不要提及“系统事件”，也不要假装学生用文字说过这些话。`,
       });
-      messages.push({ role: "user", content: "请根据上面的系统事件继续教学。" });
+      messages.push({ role: "user", content: `（系统事件，不要提及系统事件本身）本轮学生完成的是这次快速检查：「${check.prompt}」，回答「${check.attempt.response}」，${check.answer ? `预期答案「${check.answer}」，` : ""}结果「${check.attempt.correct === null ? "未判定" : check.attempt.correct ? "答对" : "答错"}」。请只针对这次检查继续，不要重复你上一条消息里已经处理过的旧检查。` });
       return streamTutorReply({
         userId: auth.userId,
         conversationId: conversation.id,
