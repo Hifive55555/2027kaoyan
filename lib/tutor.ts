@@ -147,7 +147,7 @@ export function extractTutorCheck(text: string): { text: string; check: TutorChe
 }
 
 export interface TutorRoadmapDraft {
-  add?: { title: string; parentId?: string | null }[];
+  add?: { title: string; parentId?: string | null; status?: "pending" | "in_progress" | "done" }[];
   update?: { id: string; status: "pending" | "in_progress" | "done" }[];
 }
 
@@ -158,7 +158,7 @@ export function extractTutorRoadmap(text: string): { text: string; ops: TutorRoa
   try {
     const raw = JSON.parse(block.body);
     const add = Array.isArray(raw?.add)
-      ? raw.add.map((x: any) => ({ title: textOf(x?.title, 100), parentId: x?.parentId ? textOf(x.parentId, 40) : null })).filter((x: any) => x.title.length >= 2)
+      ? raw.add.map((x: any) => ({ title: textOf(x?.title, 100), parentId: x?.parentId ? textOf(x.parentId, 40) : null, status: ["pending", "in_progress", "done"].includes(x?.status) ? x.status : undefined })).filter((x: any) => x.title.length >= 2)
       : [];
     const update = Array.isArray(raw?.update)
       ? raw.update

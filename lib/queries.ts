@@ -984,7 +984,7 @@ export function syncTutorRoadmapForReply(userId: string, conversationId: string,
 }
 
 export interface TutorRoadmapOps {
-  add?: { title: string; parentId?: string | null }[];
+  add?: { title: string; parentId?: string | null; status?: "pending" | "in_progress" | "done" }[];
   update?: { id: string; status: "pending" | "in_progress" | "done" }[];
 }
 
@@ -995,6 +995,8 @@ export function applyTutorRoadmapOps(userId: string, conversationId: string, ops
   let nextSort = Number(maxSortRow.n) + 1;
   const now = nowIso();
   const existingTitles = new Set([...existing.values()].map(i => `${i.parentId || ""}|${i.title.toLowerCase()}`));
+  const hadInProgress = [...existing.values()].some(i => i.status === "in_progress");
+  const addedIds: string[] = [];
   for (const add of (ops.add || []).slice(0, 10)) {
     if (existing.size >= 60) break;
     const title = String(add.title || "").replace(/\s+/g, " ").trim().slice(0, 100);
@@ -1004,11 +1006,19 @@ export function applyTutorRoadmapOps(userId: string, conversationId: string, ops
     if (existingTitles.has(key)) continue;
     existingTitles.add(key);
     const id = newId("tr");
+    const status = add.status && ROADMAP_STATUS.has(add.status) ? add.status : "pending";
     db.prepare(
       `INSERT INTO tutor_roadmap (id, user_id, conversation_id, parent_id, title, status, sort, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
-    ).run(id, userId, conversationId, parentId, title, nextSort++, now, now);
-    existing.set(id, { id, parentId, title, status: "pending", sort: nextSort - 1, createdAt: now, updatedAt: now });
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, userId, conversationId, parentId, title, status, nextSort++, now, now);
+    addedIds.push(id);
+    existing.set(id, { id, parentId, title, status, sort: nextSort - 1, createdAt: now, updatedAt: now });
+  }
+  // A newly added route has no existing id for the model to update. If it
+  // did not explicitly mark a current item, make the first new item current.
+  if (!hadInProgress && addedIds.length && !addedIds.some(id => existing.get(id)?.status === "in_progress")) {
+    const first = addedIds[0];
+    db.prepare(`UPDATE tutor_roadmap SET status = 'in_progress', updated_at = ? WHERE id = ? AND user_id = ?`).run(now, first, userId);
   }
   for (const update of (ops.update || []).slice(0, 12)) {
     if (!existing.has(update.id) || !ROADMAP_STATUS.has(update.status)) continue;
