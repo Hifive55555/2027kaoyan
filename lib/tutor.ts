@@ -18,7 +18,8 @@ function normalizeSubject(value: unknown): SubjectId | null {
  * the prompt. Prefer cutting at a sentence boundary.
  */
 export function limitTutorReply(reply: string): string {
-  const clean = reply.trim();
+  const stripped = reply.replace(/\[\[(?:CHECK|ROADMAP|QUIZ)\]\][\s\S]*?(?:\[\[\/(?:CHECK|ROADMAP)\]\]|$)/gi, "").trim();
+  const clean = stripped || reply.trim();
   if (clean.length <= 700) return clean;
   const window = clean.slice(0, 700);
   const punctuation = Math.max(
@@ -89,16 +90,60 @@ export function normalizeTutorCheck(raw: TutorCheckDraft | null | undefined): Tu
   };
 }
 
+function takeTaggedBlock(text: string, tag: "CHECK" | "ROADMAP"): { body: string; text: string } | null {
+  const open = new RegExp(`\\[\\[${tag}\\]\\]`, "i");
+  const match = open.exec(text);
+  if (!match) return null;
+  const start = match.index;
+  const bodyStart = start + match[0].length;
+  const closeRe = new RegExp(`\\[\\[/${tag}\\]\\]`, "i");
+  const close = closeRe.exec(text.slice(bodyStart));
+  let end = text.length;
+  let bodyEnd = text.length;
+  if (close) {
+    bodyEnd = bodyStart + close.index;
+    end = bodyEnd + close[0].length;
+  } else {
+    // Models occasionally omit the closing tag. Find the balanced JSON
+    // object so the learner never sees the raw control block.
+    const first = text.indexOf("{", bodyStart);
+    if (first >= 0) {
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      for (let i = first; i < text.length; i++) {
+        const ch = text[i];
+        if (inString) {
+          if (escaped) escaped = false;
+          else if (ch === "\\") escaped = true;
+          else if (ch === '"') inString = false;
+          continue;
+        }
+        if (ch === '"') { inString = true; continue; }
+        if (ch === "{") depth++;
+        else if (ch === "}") {
+          depth--;
+          if (depth === 0) { bodyEnd = i + 1; end = bodyEnd; break; }
+        }
+      }
+    }
+  }
+  return {
+    body: text.slice(bodyStart, bodyEnd).trim(),
+    text: (text.slice(0, start) + text.slice(end)).replace(/\n{3,}/g, "\n\n").trim(),
+  };
+}
+
 export function extractTutorCheck(text: string): { text: string; check: TutorCheckDraft | null } {
-  const match = text.match(/\[\[CHECK\]\]([\s\S]*?)\[\[\/CHECK\]\]/i);
-  if (!match) return { text, check: null };
+  const block = takeTaggedBlock(text, "CHECK");
+  if (!block) return { text, check: null };
   let check: TutorCheckDraft | null = null;
   try {
-    check = normalizeTutorCheck(JSON.parse(match[1].trim()));
+    check = normalizeTutorCheck(JSON.parse(block.body));
   } catch {
     check = null;
   }
-  return { text: text.replace(match[0], "").trim(), check };
+  return { text: block.text, check };
 }
 
 export interface TutorRoadmapDraft {
@@ -107,11 +152,11 @@ export interface TutorRoadmapDraft {
 }
 
 export function extractTutorRoadmap(text: string): { text: string; ops: TutorRoadmapDraft | null } {
-  const match = text.match(/\[\[ROADMAP\]\]([\s\S]*?)\[\[\/ROADMAP\]\]/i);
-  if (!match) return { text, ops: null };
+  const block = takeTaggedBlock(text, "ROADMAP");
+  if (!block) return { text, ops: null };
   let ops: TutorRoadmapDraft | null = null;
   try {
-    const raw = JSON.parse(match[1].trim());
+    const raw = JSON.parse(block.body);
     const add = Array.isArray(raw?.add)
       ? raw.add.map((x: any) => ({ title: textOf(x?.title, 100), parentId: x?.parentId ? textOf(x.parentId, 40) : null })).filter((x: any) => x.title.length >= 2)
       : [];
@@ -124,7 +169,7 @@ export function extractTutorRoadmap(text: string): { text: string; ops: TutorRoa
   } catch {
     ops = null;
   }
-  return { text: text.replace(match[0], "").trim(), ops };
+  return { text: block.text, ops };
 }
 
 function textOf(value: unknown, max: number): string {

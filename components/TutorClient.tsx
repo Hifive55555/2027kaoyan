@@ -349,7 +349,7 @@ export function TutorClient({
                           <div className="mb-1 flex items-center gap-1.5 text-[9px] uppercase tracking-[0.12em] text-muted">
                             <Sparkles className="h-3 w-3 text-brand" /> 老师
                           </div>
-                          {message.content ? <Markdown>{message.content}</Markdown> : message.id === streamingId ? (
+                          {message.content ? <Markdown>{visibleTutorText(message.content)}</Markdown> : message.id === streamingId ? (
                             <span className="inline-flex items-center gap-1.5 text-[11px] text-muted"><Loader2 className="h-3 w-3 animate-spin" /> 老师正在组织语言…</span>
                           ) : null}
                           {message.quiz && (
