@@ -332,8 +332,24 @@ ${input.retrievalText || ""}
 直接输出给学生的回复，不要 JSON、不要代码围栏、不要解释这些规则。`;
   return [
     { role: "system" as const, content: system },
-    ...input.history.slice(-14),
+    ...normalizeTutorHistory(input.history),
   ];
+}
+
+function normalizeTutorHistory(history: { role: "user" | "assistant" | "system"; content: string }[]) {
+  const out: { role: "user" | "assistant"; content: string }[] = [];
+  for (const item of history) {
+    if (item.role === "system") continue;
+    if (!out.length && item.role === "assistant") continue;
+    const prev = out[out.length - 1];
+    if (prev && prev.role === item.role) prev.content += `\n\n${item.content}`;
+    else out.push({ role: item.role, content: item.content });
+  }
+  const tail = out.slice(-14);
+  // DeepSeek requires the conversation to start with a user message; a
+  // window cut at an assistant turn would otherwise produce a 400.
+  while (tail.length && tail[0].role !== "user") tail.shift();
+  return tail;
 }
 
 export interface TutorQuizDraft {
