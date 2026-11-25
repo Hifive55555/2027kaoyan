@@ -16,6 +16,7 @@ import {
   getTutorQuizRaw,
   getTutorRoadmap,
   getTutorRoadmapText,
+  syncTutorRoadmapForReply,
   getTutorConversation,
   getTutorConversationForCheck,
   getTutorConversationForQuiz,
@@ -36,7 +37,10 @@ function finalizeTutorReply(userId: string, full: string, fallback: string) {
   const reply = limitTutorReply(checkParsed.text) || fallback;
   const checkId = checkParsed.check ? createTutorCheck(userId, checkParsed.check) : undefined;
   const roadmap = roadmapParsed.ops ? applyTutorRoadmapOps(userId, roadmapParsed.ops) : getTutorRoadmap(userId);
-  return { reply, checkId, roadmap, markerQuiz, implicitQuiz };
+  // The model sometimes advances the lesson without emitting a [[ROADMAP]]
+  // block. Keep the visible plan in sync as a deterministic fallback.
+  const syncedRoadmap = syncTutorRoadmapForReply(userId, reply);
+  return { reply, checkId, roadmap: syncedRoadmap || roadmap, markerQuiz, implicitQuiz };
 }
 
 function formatSources(annotations: any[]): string {

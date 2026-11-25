@@ -850,10 +850,137 @@ export function getTutorRoadmapText(userId: string): string {
   const depth = new Map<string, number>();
   for (const item of ordered) depth.set(item.id, item.parentId ? (depth.get(item.parentId) || 0) + 1 : 0);
   const status = { pending: "待学", in_progress: "进行中", done: "已完成" };
-  return ordered.slice(0, 40).map(item => {
+  const lines = ordered.slice(0, 40).map(item => {
     const pad = "  ".repeat(depth.get(item.id) || 0);
     return `${pad}- [${status[item.status]}] ${item.title}  (id: ${item.id})`;
-  }).join("\n");
+  });
+  const current = ordered.find(item => item.status === "in_progress")
+    || ordered.find(item => item.status === "pending");
+  if (current) {
+    lines.push(`当前应推进：[${status[current.status]}] ${current.title}  (id: ${current.id})`);
+  } else {
+    lines.push("当前路线已全部完成。");
+  }
+  return lines.join("\n");
+}
+
+function roadmapMatchScore(title: string, text: string): number {
+  const clean = title
+    .replace(/（[^）]*）|\([^)]*\)/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  if (!clean) return 0;
+  let score = 0;
+  if (clean.length >= 3 && text.includes(clean)) score += 12;
+  for (const part of clean.split(/[与和、，,/\\|]+/).map(x => x.trim()).filter(x => x.length >= 2)) {
+    if (text.includes(part)) score += part.length >= 5 ? 7 : part.length >= 4 ? 6 : part.length === 3 ? 4 : 2;
+  }
+  for (let n = 4; n >= 2; n--) {
+    const seen = new Set<string>();
+    for (let i = 0; i + n <= clean.length; i++) {
+      const gram = clean.slice(i, i + n).replace(/\s/g, "");
+      if (gram.length !== n || seen.has(gram)) continue;
+      seen.add(gram);
+      if (text.includes(gram)) score += n >= 4 ? 3 : n === 3 ? 2 : 1;
+    }
+  }
+  const alias = title.match(/[（(]([^）)]+)[）)]/)?.[1]?.toLowerCase();
+  if (alias && alias.split(/[，,/|\s]+/).some(x => x.length >= 2 && text.includes(x))) score += 6;
+  return score;
+}
+
+function roadmapMatchPosition(title: string, text: string): { pos: number; len: number } {
+  const clean = title
+    .replace(/（[^）]*）|\([^)]*\)/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  let bestPos = -1;
+  let bestLen = 0;
+  const consider = (part: string) => {
+    if (part.length < 2) return;
+    const at = text.indexOf(part);
+    if (at < 0) return;
+    if (part.length > bestLen || (part.length === bestLen && (bestPos < 0 || at < bestPos))) {
+      bestPos = at;
+      bestLen = part.length;
+    }
+  };
+  if (clean.length >= 3) consider(clean);
+  const parts = clean.split(/[与和、，,/\\|]+/).map(x => x.trim()).filter(x => x.length >= 2);
+  for (const part of parts) consider(part);
+  for (let n = 4; n >= 2; n--) {
+    for (let i = 0; i + n <= clean.length; i++) {
+      const gram = clean.slice(i, i + n).replace(/\s/g, "");
+      if (gram.length === n) consider(gram);
+    }
+  }
+  const alias = title.match(/[（(]([^）)]+)[）)]/)?.[1]?.toLowerCase();
+  if (alias) {
+    for (const part of alias.split(/[，,/|\s]+/)) consider(part);
+  }
+  return { pos: bestPos, len: bestLen };
+}
+
+/**
+ * The model is asked to emit [[ROADMAP]] when it moves to a new topic, but
+ * that is probabilistic. This deterministic fallback keeps the visible
+ * roadmap moving with the lesson: when the reply clearly discusses a later
+ * roadmap item, mark it in progress and close the immediately preceding
+ * items. It never moves the roadmap backwards.
+ */
+export function syncTutorRoadmapForReply(userId: string, text: string): TutorRoadmapItem[] {
+  const items = roadmapOrder(getTutorRoadmap(userId));
+  if (!items.length) return items;
+  const normalized = text.replace(/\s+/g, " ").toLowerCase();
+  const inProgressIdx = items.map(i => i.status).lastIndexOf("in_progress");
+  const doneIdx = items.map(i => i.status).lastIndexOf("done");
+  const start = inProgressIdx >= 0 ? inProgressIdx : Math.min(items.length - 1, doneIdx + 1);
+  if (start >= items.length) return items;
+
+  const candidates = items
+    .map((item, idx) => {
+      const match = roadmapMatchPosition(item.title, normalized);
+      return { item, idx, score: roadmapMatchScore(item.title, normalized), pos: match.pos, len: match.len };
+    })
+    .filter(x => x.idx >= start && x.item.status !== "done" && x.score >= 2 && x.len >= 2)
+    .sort((a, b) => b.score - a.score || a.idx - b.idx);
+  if (!candidates.length) return items;
+
+  const transitionRe = /(?:就到这里?|就到这|收掉|收尾|学完|结束|完成|进入|开始|接下来|下一步|转入|转到|继续讲|继续学|下面(?:看|学|讲))/g;
+  let transitionPos = -1;
+  for (const match of normalized.matchAll(transitionRe)) transitionPos = match.index ?? transitionPos;
+  const maxLen = Math.max(...candidates.map(x => x.len));
+  const strong = candidates.filter(x => x.len === maxLen);
+  const afterTransition = strong.filter(x => transitionPos >= 0 && x.pos > transitionPos);
+
+  // A lesson reply often lists several upcoming topics. Prefer the earliest
+  // topic unless a later one is clearly the actual focus (a much higher
+  // title match), otherwise a four-item outline would skip the roadmap
+  // straight to the last item. If the reply explicitly transitions into a
+  // topic, ignore topics mentioned before the transition phrase.
+  const best = afterTransition.length
+    ? afterTransition.sort((a, b) => a.pos - b.pos || a.idx - b.idx)[0]
+    : strong.sort((a, b) => a.pos - b.pos || a.idx - b.idx)[0];
+  const closesPrevious = /(?:就到这里?|就到这|收掉|收尾|学完|结束|完成)/.test(normalized);
+  const updates = new Map<string, "pending" | "in_progress" | "done">();
+  for (let i = 0; i < best.idx; i++) {
+    const item = items[i];
+    if (item.status === "in_progress") updates.set(item.id, "done");
+    else if (item.status === "pending" && (closesPrevious || best.idx - start <= 1)) updates.set(item.id, "done");
+  }
+  if (best.item.status === "pending") updates.set(best.item.id, "in_progress");
+  if (!updates.size) return items;
+
+  const db = getDb();
+  const now = nowIso();
+  for (const [id, status] of updates) {
+    db.prepare(
+      `UPDATE tutor_roadmap SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`
+    ).run(status, now, id, userId);
+  }
+  return getTutorRoadmap(userId);
 }
 
 export interface TutorRoadmapOps {
