@@ -98,6 +98,23 @@ function importNetworks() {
   }
 }
 
+function importDsLessons() {
+  const dir = src("kaoyan-408-ds/l");
+  if (!fs.existsSync(dir)) return;
+  for (const f of fs.readdirSync(dir).filter(f => f.endsWith(".html"))) {
+    const file = path.join(dir, f);
+    const pageDir = path.dirname(file);
+    const { node, title } = pageHtml(file, "main.wrap.lesson");
+    if (!node.length) continue;
+    const text = htmlToMarkdown(node.html() || "", { imageBase: pageDir, namespace: "knowledge-ds" });
+    add("cs408", {
+      subject: "cs408", chapter: "数据结构", title,
+      source: "408 数据结构动画/代码讲义", sourceRepo: "kaoyan-408-ds",
+      sourceUrl: repoUrl("kaoyan-408-ds", `l/${f}`), kind: "note", text,
+    });
+  }
+}
+
 function importMath() {
   const zero = src("zhangyu-math-zero-basics");
   if (fs.existsSync(zero)) {
@@ -188,6 +205,7 @@ function main() {
   ensureDir(OUT);
   import408Indexes();
   importNetworks();
+  importDsLessons();
   importMath();
   importSentences();
   importVocab();

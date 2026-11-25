@@ -54,7 +54,7 @@
 | [jlshdsdk/kaoyan-408-coa](https://github.com/jlshdsdk/kaoyan-408-coa) | 计算机组成原理带学站 + 章末习题 | 408 扩展题 + 知识点 |
 | [jlshdsdk/kaoyan-408-networks](https://github.com/jlshdsdk/kaoyan-408-networks) | 计算机网络带学站 + 章末习题/图 | 408 扩展题 + 知识点 |
 | [jlshdsdk/data-structure-site](https://github.com/jlshdsdk/data-structure-site) | 王道数据结构同步精讲 + 期末题 | 408 知识点 |
-| [jlshdsdk/kaoyan-408-ds](https://github.com/jlshdsdk/kaoyan-408-ds) | 408 数据结构动画/代码/讲义 | 保留为补充来源 |
+| [jlshdsdk/kaoyan-408-ds](https://github.com/jlshdsdk/kaoyan-408-ds) | 408 数据结构动画/代码/讲义 | 408 知识点补充 |
 | [jlshdsdk/sanda-jisuan](https://github.com/jlshdsdk/sanda-jisuan) | 考研数学三大计算 821 题 | `data/bank/math2-external.json` |
 | [jlshdsdk/zhangyu-1000t](https://github.com/jlshdsdk/zhangyu-1000t) | 张宇 1000题（数一题源） | 按数二范围筛选后加入数学题库 |
 | [jlshdsdk/kira-past-papers](https://github.com/jlshdsdk/kira-past-papers) | 数学真题切片，题干为图片 | 图片题题库，保留原图 |
