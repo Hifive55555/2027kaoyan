@@ -84,7 +84,7 @@ function streamTutorReply(input: {
 
         const finalized = finalizeTutorReply(input.userId, input.conversationId, full, input.fallback);
         const replyWithSources = finalized.reply + formatSources(sources);
-        const assistant = saveTutorMessage(input.userId, input.conversationId, "assistant", replyWithSources, undefined, finalized.checkId);
+        let assistant = saveTutorMessage(input.userId, input.conversationId, "assistant", replyWithSources, undefined, finalized.checkId);
         let quizMessage = null;
 
         const wantsQuiz = !finalized.checkId && (finalized.markerQuiz || input.explicitQuiz || finalized.implicitQuiz);
@@ -94,7 +94,8 @@ function streamTutorReply(input: {
           const hasPendingQuiz = !!lastQuiz?.quiz && !lastQuiz.quiz.attempt;
           if (!hasPendingQuiz) {
             try {
-              quizMessage = await generateTutorQuizMessage(input.userId, input.conversationId);
+              quizMessage = await generateTutorQuizMessage(input.userId, input.conversationId, undefined, assistant.id);
+              if (quizMessage) assistant = quizMessage;
             } catch (err) {
               console.error("[tutor] auto quiz failed:", err);
             }
@@ -111,7 +112,7 @@ function streamTutorReply(input: {
           roadmap: finalized.roadmap,
           conversationId: input.conversationId,
           conversationTitle: conversation?.title,
-          extraMessages: quizMessage ? [quizMessage] : [],
+          extraMessages: [],
         });
       } catch (err) {
         if (input.userMessageId) deleteTutorMessage(input.userId, input.userMessageId);

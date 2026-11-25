@@ -347,6 +347,7 @@ function normalizeTutorHistory(history: { role: "user" | "assistant" | "system";
   const out: { role: "user" | "assistant"; content: string }[] = [];
   for (const item of history) {
     if (item.role === "system") continue;
+    if (!item.content.trim()) continue;
     if (!out.length && item.role === "assistant") continue;
     const prev = out[out.length - 1];
     if (prev && prev.role === item.role) prev.content += `\n\n${item.content}`;
