@@ -157,19 +157,14 @@ export async function POST(req: NextRequest) {
         history,
       });
       messages.push({
-        role: "system" as const,
-        content: `【系统事件】学生刚刚完成了你出的巩固题。
+        role: "user",
+        content: `【系统事件】学生完成了巩固题。
 题目：${quiz.stem}
-选项：${quiz.options.map(o => `${o.key}. ${o.text}`).join("；")}
-学生选择：${quiz.attempt.answer}
+选择：${quiz.attempt.answer}
 正确答案：${quiz.answer}
 结果：${quiz.attempt.correct ? "答对" : "答错"}
-请根据这个结果自行决定下一步：可以简短确认后推进新内容、继续追问，或直接出下一题；如果答错，先针对错误引导。不要提及“系统事件”，也不要假装学生用文字说过这些话。`,
+请根据这个结果继续教学。`,
       });
-      // DeepSeek rejects a request whose last non-system message is an
-      // assistant turn. The event above is system-only, so add a hidden user
-      // turn to make this a normal continuation. It is not persisted.
-      messages.push({ role: "user", content: `（系统事件，不要提及系统事件本身）本轮学生完成的是这次巩固题：「${quiz.stem}」，选择「${quiz.attempt.answer}」，正确答案「${quiz.answer}」，结果「${quiz.attempt.correct ? "答对" : "答错"}」。请只针对这次答题继续，不要重复你上一条消息里已经处理过的旧检查。` });
       return streamTutorReply({
         userId: auth.userId,
         conversationId: conversation.id,
@@ -193,15 +188,14 @@ export async function POST(req: NextRequest) {
         retrievalText: getTutorRetrievalContext(auth.userId, conversation.id, `${check.prompt} ${check.answer}`),
         history,
       });
-      const expected = check.answer ? `\n预期答案：${check.answer}\n结果：${check.attempt.correct === null ? "未判定" : check.attempt.correct ? "答对" : "答错"}` : "";
       messages.push({
-        role: "system" as const,
-        content: `【系统事件】学生刚刚完成了你提出的快速检查。
+        role: "user",
+        content: `【系统事件】学生完成了快速检查。
 检查：${check.prompt}
-学生回答：${check.attempt.response}${expected}
-请根据回答自行决定下一步：可以确认后继续讲、追问原因，或直接推进/出题；如果回答不对，先给一个提示。不要提及“系统事件”，也不要假装学生用文字说过这些话。`,
+回答：${check.attempt.response}
+${check.answer ? `预期答案：${check.answer}\n` : ""}结果：${check.attempt.correct === null ? "未判定" : check.attempt.correct ? "答对" : "答错"}
+请根据这个结果继续教学。`,
       });
-      messages.push({ role: "user", content: `（系统事件，不要提及系统事件本身）本轮学生完成的是这次快速检查：「${check.prompt}」，回答「${check.attempt.response}」，${check.answer ? `预期答案「${check.answer}」，` : ""}结果「${check.attempt.correct === null ? "未判定" : check.attempt.correct ? "答对" : "答错"}」。请只针对这次检查继续，不要重复你上一条消息里已经处理过的旧检查。` });
       return streamTutorReply({
         userId: auth.userId,
         conversationId: conversation.id,

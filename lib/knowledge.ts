@@ -112,7 +112,9 @@ function outlineOf(text: string, limit = 16): string[] {
   const re = /(?:^|[\s。；])((?:\d+\.\d(?:\.\d+)?)|(?:\d+\.))\s*([^\s。；，,]{2,28})/g;
   for (const match of text.matchAll(re)) {
     const line = `${match[1]} ${match[2]}`.replace(/\s+/g, " ").trim();
-    if (line.length > 46 || seen.has(line)) continue;
+    if (line.length > 32 || seen.has(line)) continue;
+    if (/^[0-9]/.test(match[2]) || /^(?:图|表|展示|所示|给出|一个|所述|节|主题)/.test(match[2])) continue;
+    if (/所示|给出|展示|教材PDF|一个可能/.test(match[2])) continue;
     seen.add(line);
     found.push(line);
     if (found.length >= limit) break;
