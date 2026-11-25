@@ -71,6 +71,31 @@ function migrateTutorConversations(db: DatabaseSync) {
   }
 }
 
+function migrateTutorRoadmapConversations(db: DatabaseSync) {
+  const users = db.prepare(
+    `SELECT DISTINCT user_id FROM tutor_roadmap WHERE conversation_id IS NULL AND user_id IS NOT NULL`
+  ).all() as { user_id: string }[];
+  for (const { user_id } of users) {
+    // The pre-conversation roadmap belonged to the original long-running
+    // conversation. Attach it to the earliest conversation, not the newest
+    // one a user may have just created.
+    let conv = db.prepare(
+      `SELECT id FROM tutor_conversations WHERE user_id = ? ORDER BY created_at ASC LIMIT 1`
+    ).get(user_id) as { id: string } | undefined;
+    if (!conv) {
+      const id = `tc_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+      const now = new Date().toISOString();
+      db.prepare(
+        `INSERT INTO tutor_conversations (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+      ).run(id, user_id, "历史学习路线", now, now);
+      conv = { id };
+    }
+    db.prepare(
+      `UPDATE tutor_roadmap SET conversation_id = ? WHERE user_id = ? AND conversation_id IS NULL`
+    ).run(conv.id, user_id);
+  }
+}
+
 function migrate(db: DatabaseSync) {
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -214,6 +239,7 @@ function migrate(db: DatabaseSync) {
     CREATE TABLE IF NOT EXISTS tutor_roadmap (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
+      conversation_id TEXT,
       parent_id TEXT,
       title TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
@@ -354,8 +380,11 @@ function migrate(db: DatabaseSync) {
   addColumn(db, "messages", "user_id", "TEXT");
   addColumn(db, "tutor_messages", "check_id", "TEXT");
   addColumn(db, "tutor_messages", "conversation_id", "TEXT");
+  addColumn(db, "tutor_roadmap", "conversation_id", "TEXT");
   db.exec(`CREATE INDEX IF NOT EXISTS idx_tutor_messages_conversation ON tutor_messages(conversation_id, created_at);`);
   migrateTutorConversations(db);
+  migrateTutorRoadmapConversations(db);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_tutor_roadmap_conversation ON tutor_roadmap(conversation_id, user_id, parent_id, sort);`);
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_papers_user ON papers(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_attempts_user ON attempts(user_id, created_at);

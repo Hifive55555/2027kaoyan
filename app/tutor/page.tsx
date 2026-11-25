@@ -12,7 +12,7 @@ export default async function TutorPage({ searchParams }: { searchParams: Promis
   const conversation = getOrCreateActiveTutorConversation(session.userId!, sp.c);
   const profile = buildLearnerProfile(session.userId!);
   const messages = getTutorMessages(session.userId!, conversation.id);
-  const roadmap = getTutorRoadmap(session.userId!);
+  const roadmap = getTutorRoadmap(session.userId!, conversation.id);
   return (
     <AppShell>
       <TutorClient

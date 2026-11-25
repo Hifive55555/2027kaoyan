@@ -110,15 +110,15 @@ function syllabusExcerpts(terms: string[]): string[] {
   return out.slice(0, 3);
 }
 
-function roadmapTerms(userId: string): string[] {
-  const items = getTutorRoadmap(userId);
+function roadmapTerms(userId: string, conversationId: string): string[] {
+  const items = getTutorRoadmap(userId, conversationId);
   const active = items.filter(i => i.status === "in_progress");
   const pending = items.filter(i => i.status === "pending").slice(0, 2);
   return [...active, ...pending].map(i => i.title);
 }
 
-export function getTutorRetrievalContext(userId: string, message: string): string {
-  const query = [message, ...roadmapTerms(userId)].join(" ");
+export function getTutorRetrievalContext(userId: string, conversationId: string, message: string): string {
+  const query = [message, ...roadmapTerms(userId, conversationId)].join(" ");
   const terms = termsOf(query);
   if (!terms.length) return "";
   const all: { q: BankQuestion; score: number }[] = [];

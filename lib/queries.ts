@@ -814,10 +814,10 @@ function toRoadmapItem(row: Row): TutorRoadmapItem {
   };
 }
 
-export function getTutorRoadmap(userId: string): TutorRoadmapItem[] {
+export function getTutorRoadmap(userId: string, conversationId: string): TutorRoadmapItem[] {
   const rows = getDb().prepare(
-    `SELECT * FROM tutor_roadmap WHERE user_id = ? ORDER BY sort ASC, created_at ASC`
-  ).all(userId) as Row[];
+    `SELECT * FROM tutor_roadmap WHERE user_id = ? AND conversation_id = ? ORDER BY sort ASC, created_at ASC`
+  ).all(userId, conversationId) as Row[];
   return rows.map(toRoadmapItem);
 }
 
@@ -843,8 +843,8 @@ function roadmapOrder(items: TutorRoadmapItem[]): TutorRoadmapItem[] {
   return out;
 }
 
-export function getTutorRoadmapText(userId: string): string {
-  const items = getTutorRoadmap(userId);
+export function getTutorRoadmapText(userId: string, conversationId: string): string {
+  const items = getTutorRoadmap(userId, conversationId);
   if (!items.length) return "（暂无学习路线；当开始新主题时，先列出接下来 1–3 个可执行点。）";
   const ordered = roadmapOrder(items);
   const depth = new Map<string, number>();
@@ -930,8 +930,8 @@ function roadmapMatchPosition(title: string, text: string): { pos: number; len: 
  * roadmap item, mark it in progress and close the immediately preceding
  * items. It never moves the roadmap backwards.
  */
-export function syncTutorRoadmapForReply(userId: string, text: string): TutorRoadmapItem[] {
-  const items = roadmapOrder(getTutorRoadmap(userId));
+export function syncTutorRoadmapForReply(userId: string, conversationId: string, text: string): TutorRoadmapItem[] {
+  const items = roadmapOrder(getTutorRoadmap(userId, conversationId));
   if (!items.length) return items;
   const normalized = text.replace(/\s+/g, " ").toLowerCase();
   const inProgressIdx = items.map(i => i.status).lastIndexOf("in_progress");
@@ -980,7 +980,7 @@ export function syncTutorRoadmapForReply(userId: string, text: string): TutorRoa
       `UPDATE tutor_roadmap SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`
     ).run(status, now, id, userId);
   }
-  return getTutorRoadmap(userId);
+  return getTutorRoadmap(userId, conversationId);
 }
 
 export interface TutorRoadmapOps {
@@ -988,10 +988,10 @@ export interface TutorRoadmapOps {
   update?: { id: string; status: "pending" | "in_progress" | "done" }[];
 }
 
-export function applyTutorRoadmapOps(userId: string, ops: TutorRoadmapOps): TutorRoadmapItem[] {
+export function applyTutorRoadmapOps(userId: string, conversationId: string, ops: TutorRoadmapOps): TutorRoadmapItem[] {
   const db = getDb();
-  const existing = new Map(getTutorRoadmap(userId).map(i => [i.id, i]));
-  const maxSortRow = db.prepare(`SELECT COALESCE(MAX(sort), -1) AS n FROM tutor_roadmap WHERE user_id = ?`).get(userId) as Row;
+  const existing = new Map(getTutorRoadmap(userId, conversationId).map(i => [i.id, i]));
+  const maxSortRow = db.prepare(`SELECT COALESCE(MAX(sort), -1) AS n FROM tutor_roadmap WHERE user_id = ? AND conversation_id = ?`).get(userId, conversationId) as Row;
   let nextSort = Number(maxSortRow.n) + 1;
   const now = nowIso();
   const existingTitles = new Set([...existing.values()].map(i => `${i.parentId || ""}|${i.title.toLowerCase()}`));
@@ -1005,9 +1005,9 @@ export function applyTutorRoadmapOps(userId: string, ops: TutorRoadmapOps): Tuto
     existingTitles.add(key);
     const id = newId("tr");
     db.prepare(
-      `INSERT INTO tutor_roadmap (id, user_id, parent_id, title, status, sort, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`
-    ).run(id, userId, parentId, title, nextSort++, now, now);
+      `INSERT INTO tutor_roadmap (id, user_id, conversation_id, parent_id, title, status, sort, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
+    ).run(id, userId, conversationId, parentId, title, nextSort++, now, now);
     existing.set(id, { id, parentId, title, status: "pending", sort: nextSort - 1, createdAt: now, updatedAt: now });
   }
   for (const update of (ops.update || []).slice(0, 12)) {
@@ -1015,16 +1015,16 @@ export function applyTutorRoadmapOps(userId: string, ops: TutorRoadmapOps): Tuto
     db.prepare(`UPDATE tutor_roadmap SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
       .run(update.status, now, update.id, userId);
   }
-  return getTutorRoadmap(userId);
+  return getTutorRoadmap(userId, conversationId);
 }
 
 export function setTutorRoadmapStatus(userId: string, id: string, status: "pending" | "in_progress" | "done"): TutorRoadmapItem[] | null {
   if (!ROADMAP_STATUS.has(status)) return null;
-  const row = getDb().prepare(`SELECT id FROM tutor_roadmap WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
+  const row = getDb().prepare(`SELECT id, conversation_id FROM tutor_roadmap WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
   if (!row) return null;
   getDb().prepare(`UPDATE tutor_roadmap SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
     .run(status, nowIso(), id, userId);
-  return getTutorRoadmap(userId);
+  return getTutorRoadmap(userId, row.conversation_id || "");
 }
 
 

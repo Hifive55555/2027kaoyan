@@ -28,7 +28,7 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 180;
 
-function finalizeTutorReply(userId: string, full: string, fallback: string) {
+function finalizeTutorReply(userId: string, conversationId: string, full: string, fallback: string) {
   const markerQuiz = /\[\[QUIZ\]\]/i.test(full);
   const implicitQuiz = /(?:给你|我们|要不|我).{0,12}(?:出|做|练).{0,8}(?:一道|一题)|巩固一下|试一道/.test(full);
   const noQuiz = full.replace(/\[\[QUIZ\]\]/gi, "").trim();
@@ -36,10 +36,10 @@ function finalizeTutorReply(userId: string, full: string, fallback: string) {
   const checkParsed = extractTutorCheck(roadmapParsed.text);
   const reply = limitTutorReply(checkParsed.text) || fallback;
   const checkId = checkParsed.check ? createTutorCheck(userId, checkParsed.check) : undefined;
-  const roadmap = roadmapParsed.ops ? applyTutorRoadmapOps(userId, roadmapParsed.ops) : getTutorRoadmap(userId);
+  const roadmap = roadmapParsed.ops ? applyTutorRoadmapOps(userId, conversationId, roadmapParsed.ops) : getTutorRoadmap(userId, conversationId);
   // The model sometimes advances the lesson without emitting a [[ROADMAP]]
   // block. Keep the visible plan in sync as a deterministic fallback.
-  const syncedRoadmap = syncTutorRoadmapForReply(userId, reply);
+  const syncedRoadmap = syncTutorRoadmapForReply(userId, conversationId, reply);
   return { reply, checkId, roadmap: syncedRoadmap || roadmap, markerQuiz, implicitQuiz };
 }
 
@@ -86,7 +86,7 @@ function streamTutorReply(input: {
           send({ delta });
         }, { maxTokens: 3000, temperature: 0.55, effort: "high", webSearch: true, onMeta: meta => { sources = meta.annotations; } });
 
-        const finalized = finalizeTutorReply(input.userId, full, input.fallback);
+        const finalized = finalizeTutorReply(input.userId, input.conversationId, full, input.fallback);
         const replyWithSources = finalized.reply + formatSources(sources);
         const assistant = saveTutorMessage(input.userId, input.conversationId, "assistant", replyWithSources, undefined, finalized.checkId);
         let quizMessage = null;
@@ -152,8 +152,8 @@ export async function POST(req: NextRequest) {
       const profile = buildLearnerProfile(auth.userId);
       const messages = buildTutorMessages({
         profileText: toLearnerPrompt(profile),
-        roadmapText: getTutorRoadmapText(auth.userId),
-        retrievalText: getTutorRetrievalContext(auth.userId, `${quiz.stem} ${quiz.topic} ${quiz.chapter}`),
+        roadmapText: getTutorRoadmapText(auth.userId, conversation.id),
+        retrievalText: getTutorRetrievalContext(auth.userId, conversation.id, `${quiz.stem} ${quiz.topic} ${quiz.chapter}`),
         history,
       });
       messages.push({
@@ -189,8 +189,8 @@ export async function POST(req: NextRequest) {
       const profile = buildLearnerProfile(auth.userId);
       const messages = buildTutorMessages({
         profileText: toLearnerPrompt(profile),
-        roadmapText: getTutorRoadmapText(auth.userId),
-        retrievalText: getTutorRetrievalContext(auth.userId, `${check.prompt} ${check.answer}`),
+        roadmapText: getTutorRoadmapText(auth.userId, conversation.id),
+        retrievalText: getTutorRetrievalContext(auth.userId, conversation.id, `${check.prompt} ${check.answer}`),
         history,
       });
       const expected = check.answer ? `\n预期答案：${check.answer}\n结果：${check.attempt.correct === null ? "未判定" : check.attempt.correct ? "答对" : "答错"}` : "";
@@ -225,8 +225,8 @@ export async function POST(req: NextRequest) {
     const profile = buildLearnerProfile(auth.userId);
     const messages = buildTutorMessages({
       profileText: toLearnerPrompt(profile),
-      roadmapText: getTutorRoadmapText(auth.userId),
-      retrievalText: getTutorRetrievalContext(auth.userId, message),
+      roadmapText: getTutorRoadmapText(auth.userId, conversation.id),
+      retrievalText: getTutorRetrievalContext(auth.userId, conversation.id, message),
       history,
     });
     const explicitQuiz = /出题|来一道|练一题|做一道题/.test(message)
