@@ -295,6 +295,16 @@ function migrate(db: DatabaseSync) {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS random_generated_questions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      chapter TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      used_at TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS random_attempts (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -361,6 +371,7 @@ function migrate(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash);
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
     CREATE INDEX IF NOT EXISTS idx_random_user ON random_attempts(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_random_generated_user ON random_generated_questions(user_id, used_at, created_at);
     CREATE INDEX IF NOT EXISTS idx_random_messages ON random_messages(user_id, question_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_tutor_messages_user ON tutor_messages(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_tutor_conversations_user ON tutor_conversations(user_id, updated_at);

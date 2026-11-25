@@ -3,6 +3,8 @@ import path from "node:path";
 import { getDb, newId, nowIso } from "./db";
 import { SUBJECTS } from "./subjects";
 import type { SubjectId } from "./types";
+import { generateRandomQuestion } from "./random-generate";
+import type { GeneratedRandomQuestion, RandomQuestionPublic } from "./random-types";
 
 type BankQuestion = {
   id: string;
@@ -23,9 +25,13 @@ type Pool = { byId: Map<string, BankQuestion>; bySubject: Map<string, BankQuesti
 
 declare global {
   var __yantuRandomPool: Pool | undefined;
+  var __yantuRandomGenerating: Set<string> | undefined;
 }
 
-function answerLetter(q: BankQuestion): string {
+const FIGURE_REF = /(?:如图|如下图|下图|上图|图所示|图示|见图|题图|图\s*\d)/;
+const IMAGE_MD = /!\[[^\]]*\]\([^)]+\)|<img\b/i;
+
+function answerLetter(q: { answer?: unknown }): string {
   return String(q.answer || "").toUpperCase().replace(/[^A-D]/g, "").slice(0, 1);
 }
 
@@ -115,8 +121,79 @@ export function pickRandomQuestion(userId: string, excludeId?: string): ReturnTy
   return all.length ? randomQuestionPublic(all[Math.floor(Math.random() * all.length)]) : null;
 }
 
+function generatedPublic(q: GeneratedRandomQuestion): RandomQuestionPublic {
+  const { answer: _answer, explanation: _explanation, ...pub } = q;
+  return { ...pub, generated: true };
+}
+
+function generatedRow(userId: string, questionId: string): GeneratedRandomQuestion | null {
+  const row = getDb().prepare(
+    `SELECT payload FROM random_generated_questions WHERE id = ? AND user_id = ?`
+  ).get(questionId, userId) as { payload: string } | undefined;
+  if (!row) return null;
+  try { return JSON.parse(row.payload) as GeneratedRandomQuestion; } catch { return null; }
+}
+
+function takeGeneratedQuestion(userId: string, excludeId?: string): GeneratedRandomQuestion | null {
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT id, payload FROM random_generated_questions
+     WHERE user_id = ? AND used_at IS NULL AND (? = '' OR id != ?)
+     ORDER BY created_at ASC LIMIT 1`
+  ).get(userId, excludeId || "", excludeId || "") as { id: string; payload: string } | undefined;
+  if (!row) return null;
+  const claimed = db.prepare(
+    `UPDATE random_generated_questions SET used_at = ? WHERE id = ? AND user_id = ? AND used_at IS NULL`
+  ).run(nowIso(), row.id, userId);
+  if (!claimed.changes) return null;
+  try { return JSON.parse(row.payload) as GeneratedRandomQuestion; } catch { return null; }
+}
+
+function generatedReadyCount(userId: string): number {
+  const row = getDb().prepare(
+    `SELECT COUNT(*) AS n FROM random_generated_questions WHERE user_id = ? AND used_at IS NULL`
+  ).get(userId) as { n: number };
+  return Number(row.n) || 0;
+}
+
+/**
+ * Keep one AI-generated question ready. The random stream is deliberately
+ * hybrid: retrieval questions give stable exam coverage, generated ones keep
+ * the stream from repeating while the model works ahead of the client.
+ */
+export async function fillRandomBuffer(userId: string): Promise<void> {
+  if (!globalThis.__yantuRandomGenerating) globalThis.__yantuRandomGenerating = new Set();
+  if (globalThis.__yantuRandomGenerating.has(userId)) return;
+  if (generatedReadyCount(userId) >= 1) return;
+  globalThis.__yantuRandomGenerating.add(userId);
+  try {
+    const q = await generateRandomQuestion(userId);
+    if (!q) console.error("[random] generated question rejected");
+  } catch (err) {
+    console.error("[random] generation failed:", err);
+  } finally {
+    globalThis.__yantuRandomGenerating.delete(userId);
+  }
+}
+
+export async function nextRandomQuestion(userId: string, excludeId?: string): Promise<RandomQuestionPublic | null> {
+  const useGenerated = Math.random() < 0.5;
+  if (useGenerated) {
+    const generated = takeGeneratedQuestion(userId, excludeId);
+    if (generated) {
+      void fillRandomBuffer(userId);
+      return generatedPublic(generated);
+    }
+  }
+  const bank = pickRandomQuestion(userId, excludeId);
+  void fillRandomBuffer(userId);
+  if (bank) return bank;
+  const fallback = takeGeneratedQuestion(userId, excludeId);
+  return fallback ? generatedPublic(fallback) : null;
+}
+
 export function gradeRandom(userId: string, questionId: string, rawAnswer: string) {
-  const q = pool().byId.get(questionId);
+  const q = pool().byId.get(questionId) || generatedRow(userId, questionId);
   if (!q) throw new Error("题目不存在");
   const answer = String(rawAnswer || "").toUpperCase().replace(/[^A-Z]/g, "");
   const correct = answer === answerLetter(q);
@@ -163,7 +240,7 @@ export function getRandomHistory(userId: string, limit = 20): RandomHistoryItem[
   ).all(userId, limit) as Record<string, any>[];
   const p = pool();
   return rows.map(r => {
-    const q = p.byId.get(r.question_id);
+    const q = p.byId.get(r.question_id) || generatedRow(userId, r.question_id);
     return {
       id: r.id,
       questionId: r.question_id,
@@ -210,8 +287,8 @@ export function sampleBankQuestions(count = 10): FullBankQuestion[] {
 }
 
 
-export function getRandomQuestionDetail(id: string) {
-  const q = pool().byId.get(id);
+export function getRandomQuestionDetail(id: string, userId?: string) {
+  const q = pool().byId.get(id) || (userId ? generatedRow(userId, id) : null);
   if (!q) return null;
   return {
     id: q.id,

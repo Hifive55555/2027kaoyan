@@ -19,6 +19,7 @@ type RQ = {
   chapter: string;
   topic: string;
   difficulty: string;
+  generated?: boolean;
   stem: string;
   options: { key: string; text: string }[];
 };
@@ -162,7 +163,7 @@ export function RandomClient({ initial, initialStats, displayName }: {
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand-soft text-brand"><Dices className="h-4 w-4" /></span>
             <div>
               <div className="font-serif text-[15px] leading-4">随机刷题</div>
-              <div className="text-[9px] text-faint">真题随机流 · 点选项即判</div>
+              <div className="text-[9px] text-faint">题库检索 + AI 缓冲 · 点选项即判</div>
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2 text-[10px] text-muted">
@@ -180,7 +181,7 @@ export function RandomClient({ initial, initialStats, displayName }: {
             <span className={cn("rounded-full px-2.5 py-1", SUBJECT_STYLE[current.subject] || "bg-surface-2 text-muted")}>
               {current.subjectName}
             </span>
-            <span>{current.year ? `${current.year} 年 · 第 ${current.number} 题` : current.difficulty}</span>
+            <span>{current.year ? `${current.year} 年 · 第 ${current.number} 题` : current.generated ? `AI 生成 · ${current.difficulty}` : current.difficulty}</span>
             <span className="hidden sm:inline">· {current.chapter}</span>
           </div>
           <button onClick={() => advance(true)} disabled={loadingNext || !!result} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] text-faint hover:bg-hover hover:text-ink disabled:opacity-30">
@@ -261,7 +262,7 @@ export function RandomClient({ initial, initialStats, displayName }: {
         </section>
 
         <div className="mt-4 flex items-center justify-between text-[10px] text-faint">
-          <span>题目来自备考台题库（含 AI 生成的英语短题），已隐藏答案</span>
+          <span>题库检索 + AI 预生成，答案已隐藏</span>
           <span>{current.topic || ""}</span>
         </div>
       </div>

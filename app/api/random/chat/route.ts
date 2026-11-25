@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   if (!auth) return Response.json({ error: "请先登录" }, { status: 401 });
   const questionId = req.nextUrl.searchParams.get("questionId") || "";
   if (!questionId) return Response.json({ error: "缺少 questionId" }, { status: 400 });
-  if (!getRandomQuestionDetail(questionId)) return Response.json({ error: "题目不存在" }, { status: 404 });
+  if (!getRandomQuestionDetail(questionId, auth.userId)) return Response.json({ error: "题目不存在" }, { status: 404 });
   return Response.json({ messages: getRandomMessages(auth.userId, questionId) });
 }
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const questionId = String(body.questionId || "");
     const message = String(body.message || "").trim();
     if (!questionId || !message) return Response.json({ error: "缺少内容" }, { status: 400 });
-    const q = getRandomQuestionDetail(questionId);
+    const q = getRandomQuestionDetail(questionId, auth.userId);
     if (!q) return Response.json({ error: "题目不存在" }, { status: 404 });
     const subject = getSubjectSafe(q.subject);
     if (!subject) return Response.json({ error: "科目配置缺失" }, { status: 500 });
