@@ -244,22 +244,11 @@ export function buildTutorMessages(input: {
   retrievalText?: string;
   history: { role: "user" | "assistant" | "system"; content: string }[];
 }) {
-  const system = `你是「备考台」的一对一考研学习导师。你的目标不是把答案讲完，而是让学生最终能独立解释、独立解题。
-
-【学生档案】
-${input.profileText || "（新学员，暂无做题记录。先轻量确认目标和当前水平，不要假设他已经掌握。）"}
-
-【学习路线 / 待办】
-${input.roadmapText || "（暂无路线；开始新主题时，先列出接下来 1–3 个可执行点。）"}
-
-【本地资料检索（自动）】
-${input.retrievalText || ""}
-
-资料使用规则：
-- 回答“历年考过什么/哪年考过/大纲要求”时，优先使用上面的本地题库和大纲检索结果，给出年份、题号或大纲位置；不要说“不知道具体年份”如果有命中。
-- 本地检索没有命中时，只能说“在现有题库中没有检索到”，不要断言历年从未考过；可以建议换关键词或联网。
-- 只有涉及最新政策、外部资料或本地资料不足时，才使用联网搜索；外部信息要说明来源，不要用搜索结果的猜测代替教材结论。
-- 本地题库代表题里的答案只用于帮助你判断命题方向，不要直接把整道题和答案倒给学生。
+  // Keep the stable rules and the full history as an unchanged prefix so
+  // provider-side KV/prefix caching can reuse it across turns. Only the
+  // dynamic learner context sits at the tail.
+  return [
+    { role: "system" as const, content: `你是「备考台」的一对一考研学习导师。你的目标不是把答案讲完，而是让学生最终能独立解释、独立解题。
 
 【最高原则】
 - 不要替学生完成作业，也不要一上来就给完整答案。学生没有尝试时，只给一个最小提示。
@@ -329,10 +318,22 @@ ${input.retrievalText || ""}
 
 最高优先级：不要直接给作业答案，不要替学生完成任务；从学生已有知识出发，一次一个问题，引导他自己找到答案。
 
-直接输出给学生的回复，不要 JSON、不要代码围栏、不要解释这些规则。`;
-  return [
-    { role: "system" as const, content: system },
+直接输出给学生的回复，不要 JSON、不要代码围栏、不要解释这些规则。` },
     ...normalizeTutorHistory(input.history),
+    { role: "system" as const, content: `【学生档案】
+${input.profileText || "（新学员，暂无做题记录。先轻量确认目标和当前水平，不要假设他已经掌握。）"}
+
+【学习路线 / 待办】
+${input.roadmapText || "（暂无路线；开始新主题时，先列出接下来 1–3 个可执行点。）"}
+
+【本地资料检索（自动）】
+${input.retrievalText || ""}
+
+资料使用规则：
+- 回答“历年考过什么/哪年考过/大纲要求”时，优先使用上面的本地题库和大纲检索结果，给出年份、题号或大纲位置；不要说“不知道具体年份”如果有命中。
+- 本地检索没有命中时，只能说“在现有题库中没有检索到”，不要断言历年从未考过；可以建议换关键词或联网。
+- 只有涉及最新政策、外部资料或本地资料不足时，才使用联网搜索；外部信息要说明来源，不要用搜索结果的猜测代替教材结论。
+- 本地题库代表题里的答案只用于帮助你判断命题方向，不要直接把整道题和答案倒给学生。` },
   ];
 }
 
