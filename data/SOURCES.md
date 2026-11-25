@@ -42,3 +42,31 @@
 - 政治分析题参考答案为公开资料整理，非官方评分细则。
 - 408 的部分题图（树、流水线、网络拓扑）未随文本保存；Markdown 中保留图片引用或缺失提示。
 - 所有题目、解析仅用于个人学习，不用于商业用途。
+
+## 扩展知识点与题库（2026-11 更新）
+
+以下仓库用于扩充 408、数学二、英语的知识点和图片题库：
+
+| 来源 | 内容 | 本项目用途 |
+| --- | --- | --- |
+| [jlshdsdk/relax-1000](https://github.com/jlshdsdk/relax-1000) | 408 1000题，含题干/选项/解析/题图 | `data/bank/cs408-external.json` |
+| [jlshdsdk/kaoyan-408-os](https://github.com/jlshdsdk/kaoyan-408-os) | 操作系统带学站 + 章末习题 | 408 扩展题 + 知识点 |
+| [jlshdsdk/kaoyan-408-coa](https://github.com/jlshdsdk/kaoyan-408-coa) | 计算机组成原理带学站 + 章末习题 | 408 扩展题 + 知识点 |
+| [jlshdsdk/kaoyan-408-networks](https://github.com/jlshdsdk/kaoyan-408-networks) | 计算机网络带学站 + 章末习题/图 | 408 扩展题 + 知识点 |
+| [jlshdsdk/data-structure-site](https://github.com/jlshdsdk/data-structure-site) | 王道数据结构同步精讲 + 期末题 | 408 知识点 |
+| [jlshdsdk/kaoyan-408-ds](https://github.com/jlshdsdk/kaoyan-408-ds) | 408 数据结构动画/代码/讲义 | 保留为补充来源 |
+| [jlshdsdk/sanda-jisuan](https://github.com/jlshdsdk/sanda-jisuan) | 考研数学三大计算 821 题 | `data/bank/math2-external.json` |
+| [jlshdsdk/zhangyu-1000t](https://github.com/jlshdsdk/zhangyu-1000t) | 张宇 1000题（数一题源） | 按数二范围筛选后加入数学题库 |
+| [jlshdsdk/kira-past-papers](https://github.com/jlshdsdk/kira-past-papers) | 数学真题切片，题干为图片 | 图片题题库，保留原图 |
+| [jlshdsdk/zhangyu-math-zero-basics](https://github.com/jlshdsdk/zhangyu-math-zero-basics) | 张宇基础30讲零基础部分 | 数学二知识点 |
+| [jlshdsdk/zhangyu-30jiang-selfstudy](https://github.com/jlshdsdk/zhangyu-30jiang-selfstudy) | 张宇基础30讲自学版 | 数学二知识点 |
+| [jlshdsdk/english-sentences](https://github.com/jlshdsdk/english-sentences) | 斌斌66句 + Monkey百句 | 英语二长难句知识点 |
+| [jlshdsdk/kaoyan-vocab5](https://github.com/jlshdsdk/kaoyan-vocab5) | 五书合一 9404 词 | 英语二词汇知识点 |
+| [jlshdsdk/kaoyan-vocab](https://github.com/jlshdsdk/kaoyan-vocab) | 红宝书/真题词汇单页 | 与 vocab5 重叠，保留来源记录 |
+
+### 题图处理
+
+- 导入 HTML 题库时，先把 `<img>`/`src` 指向的本地图片复制到 `public/assets/external/<source>/...`，再在题干、选项或解析中写入标准 Markdown 图片：`![题图](/assets/external/...)`。
+- 对于 Kira 这类「题干本身就是一张扫描图」的来源，不强行 OCR 成文字；题库保存原图，复习时按原图作答，避免 OCR 把公式和图形弄错。
+- 知识点页面与随机刷题共用 `Markdown` 渲染器，图片能直接显示；AI 检索会优先使用同一条目中的文字，图片题以标题/来源作为语义锚点。
+- 重新生成：先 `bash scripts/fetch-external.sh`，再 `npm run data:external`。

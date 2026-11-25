@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getTutorRoadmap } from "./queries";
+import { knowledgeExcerpt } from "./knowledge";
 import type { SubjectId } from "./types";
 
 type BankQuestion = {
@@ -15,6 +16,7 @@ type BankQuestion = {
   options?: { key: string; text: string }[];
   answer?: unknown;
   explanation?: string;
+  source?: string;
 };
 
 type Bank = { meta: { subject: string; name: string; years: number[]; count: number }; questions: BankQuestion[] };
@@ -38,12 +40,16 @@ function banks(): Bank[] {
   const cache = globalThis.__tutorBanks;
   for (const subject of ["math2", "english2", "politics", "cs408"]) {
     if (cache.has(subject)) continue;
-    const file = path.join(process.cwd(), "data/bank", `${subject}.json`);
-    try {
-      const data = JSON.parse(fs.readFileSync(file, "utf8")) as Bank;
-      data.questions = (data.questions || []).map(q => ({ ...q, subject: subject as SubjectId }));
-      cache.set(subject, data);
-    } catch { /* optional bank */ }
+    const files = [`${subject}.json`, `${subject}-external.json`];
+    const questions: BankQuestion[] = [];
+    for (const name of files) {
+      const file = path.join(process.cwd(), "data/bank", name);
+      try {
+        const data = JSON.parse(fs.readFileSync(file, "utf8")) as Bank;
+        questions.push(...(data.questions || []).map(q => ({ ...q, subject: subject as SubjectId })));
+      } catch { /* optional bank */ }
+    }
+    cache.set(subject, { meta: { subject, name: subject, years: [], count: questions.length }, questions });
   }
   return [...cache.values()];
 }
@@ -124,19 +130,24 @@ export function getTutorRetrievalContext(userId: string, message: string): strin
   }
   all.sort((a, b) => b.score - a.score || b.q.year - a.q.year);
   const hits = all.slice(0, 60);
-  if (!hits.length) return `【本地题库检索】未找到明确匹配的历年题。不要据此断言“没有考过”；可提示用户换关键词或联网搜索。`;
+  if (!hits.length) {
+    const knowledge = knowledgeExcerpt(undefined, query, 3, 420);
+    return `【本地题库检索】未找到明确匹配的历年题。不要据此断言“没有考过”；可提示用户换关键词或联网搜索。${knowledge ? `\n【本地知识点检索（自动）】\n${knowledge}` : ""}`;
+  }
   const byYear = new Map<number, number>();
   for (const h of hits) byYear.set(h.q.year, (byYear.get(h.q.year) || 0) + 1);
   const years = [...byYear.entries()].sort((a, b) => b[0] - a[0]).slice(0, 15)
     .map(([y, n]) => `${y}(${n})`).join("、");
   const samples = hits.slice(0, 8).map(({ q }) => {
     const ans = compact(q.answer, 40);
-    return `- ${q.year} 年第 ${q.number} 题 [${SUBJECT_LABEL[q.subject] || q.subject}·${q.chapter || ""}] ${compact(q.stem, 120)}${ans ? `（答案：${ans}）` : ""}`;
+    const label = q.year ? `${q.year} 年第 ${q.number} 题` : `扩展题第 ${q.number} 题`;
+    return `- ${label} [${SUBJECT_LABEL[q.subject] || q.subject}·${q.chapter || ""}] ${compact(q.stem, 120)}${ans ? `（答案：${ans}）` : ""}`;
   }).join("\n");
   const syllabus = syllabusExcerpts(terms);
+  const knowledge = knowledgeExcerpt(undefined, query, 2, 420);
   return `【本地题库检索（自动）】
 匹配 ${all.length} 道；年份分布：${years || "无"}。
 代表题：
 ${samples}
-${syllabus.length ? `【2027 大纲相关】\n${syllabus.join("\n")}` : ""}`;
+${syllabus.length ? `【2027 大纲相关】\n${syllabus.join("\n")}` : ""}${knowledge ? `\n【本地知识点检索（自动）】\n${knowledge}` : ""}`;
 }

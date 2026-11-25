@@ -37,21 +37,25 @@ function eligible(q: BankQuestion): boolean {
 }
 
 function loadBank(subject: "math2" | "politics" | "cs408" | "english2"): BankQuestion[] {
-  const file = path.join(process.cwd(), "data/bank", subject === "english2" ? "english2-random.json" : `${subject}.json`);
-  if (!fs.existsSync(file)) return [];
-  try {
-    const data = JSON.parse(fs.readFileSync(file, "utf8"));
-    return (data.questions || [])
-      .filter(eligible)
-      .map((q: BankQuestion) => ({
-        ...q,
-        subject,
-        options: q.options.map(o => ({ key: String(o.key), text: String(o.text) })),
-        answer: answerLetter(q),
-      }));
-  } catch {
-    return [];
+  const base = subject === "english2" ? "english2-random.json" : `${subject}.json`;
+  const files = [base, `${subject}-external.json`];
+  const out: BankQuestion[] = [];
+  for (const name of files) {
+    const file = path.join(process.cwd(), "data/bank", name);
+    if (!fs.existsSync(file)) continue;
+    try {
+      const data = JSON.parse(fs.readFileSync(file, "utf8"));
+      out.push(...(data.questions || [])
+        .filter(eligible)
+        .map((q: BankQuestion) => ({
+          ...q,
+          subject,
+          options: q.options.map(o => ({ key: String(o.key), text: String(o.text) })),
+          answer: answerLetter(q),
+        })));
+    } catch { /* optional bank */ }
   }
+  return out;
 }
 
 function pool(): Pool {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, PenLine, Library, History, Dices, Gamepad2, MessageCircle } from "lucide-react";
+import { Home, PenLine, Library, History, Dices, Gamepad2, MessageCircle, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
@@ -11,6 +11,7 @@ const ITEMS = [
   { href: "/random", label: "随机", icon: Dices },
   { href: "/match", label: "比赛", icon: Gamepad2 },
   { href: "/tutor", label: "答疑", icon: MessageCircle },
+  { href: "/knowledge", label: "知识点", icon: BookOpen },
   { href: "/history", label: "记录", icon: History },
 ];
 
@@ -18,7 +19,7 @@ export function MobileNav() {
   const pathname = usePathname();
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface-2/95 backdrop-blur lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-6 px-1 pb-[env(safe-area-inset-bottom)]">
+      <div className="mx-auto grid max-w-md grid-cols-7 px-1 pb-[env(safe-area-inset-bottom)]">
         {ITEMS.map(item => {
           const Icon = item.icon;
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

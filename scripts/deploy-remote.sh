@@ -19,6 +19,7 @@ tar \
   --exclude=.next/cache \
   --exclude=.next/dev \
   --exclude=data/raw \
+  --exclude=.cache \
   --exclude='data/app.db*' \
   --exclude=data/uploads \
   --exclude=data/learner \

@@ -61,6 +61,7 @@ export function buildGenerationMessages(input: {
   chapterNames: string[];
   exemplars: Exemplar[];
   englishExcerpt?: string;
+  knowledgeExcerpt?: string;
   weakTopics?: string[];
   avoid?: string[];
   planOverride?: QuestionPlan[];
@@ -99,6 +100,7 @@ ${subject.highlights.map(h => `- ${h}`).join("\n")}
 ${formatExemplars(input.exemplars)}
 
 ${input.englishExcerpt ? `【真实文章风格参考（禁止照抄）】\n${input.englishExcerpt}\n` : ""}
+${input.knowledgeExcerpt ? `【本地知识点参考（只用于把握考点，不要整段照抄）】\n${input.knowledgeExcerpt}\n` : ""}
 ${input.weakTopics?.length ? `【学生近期薄弱点】${input.weakTopics.join("、")}。请在这些方向适当增加针对性。` : ""}
 ${input.avoid?.length ? `【避免重复】最近生成过的题干主题：${input.avoid.join("；")}。不要生成相同题目。` : ""}
 

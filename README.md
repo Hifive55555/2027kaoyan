@@ -64,6 +64,8 @@ app/                     Next.js App Router 页面与 API
   page.tsx               今日首页
   practice/              组卷、答题、总结
   tutor/                 全局 AI 答疑（学习档案 + 出题巩固）
+  knowledge/             扩展知识点浏览与检索
+  bank/                  扩展题库浏览（含原题图片）
   corpus/                真题库（Markdown）
   history/               练习记录与逐题回看
   mistakes/              错题本
@@ -72,9 +74,13 @@ app/                     Next.js App Router 页面与 API
   api/                   papers / grade / skip / chat / random / tutor / similar / uploads
 components/              界面组件（含 Markdown + KaTeX、追问面板）
 lib/                     DB、DeepSeek、提示词、题库/大纲检索、学习档案、数据访问
-  tutor-retrieval.ts     本地题库 + 大纲自动检索（注入答疑上下文）
+  tutor-retrieval.ts     本地题库 + 大纲 + 扩展知识点自动检索（注入答疑上下文）
+  knowledge.ts           扩展知识点索引、搜索与答疑摘录
+  external-bank.ts       扩展题库读取与检索
 data/
-  bank/                  结构化题库（JSON，供检索/统计）
+  bank/                  结构化题库（JSON，供检索/统计；含 *-external.json 扩展题库）
+  knowledge/             扩展知识点索引（408/数学/英语）
+  public/assets/external/题图资源（题库/知识点图片）
   corpus/                真题 Markdown（供阅读/AI 检索）
   syllabus/              2027 大纲原文与结构化配置
   raw/                   构建题库的原始材料（可选）
@@ -83,6 +89,10 @@ scripts/
   ingest/                各科数据清洗脚本
   build-data.mjs         重建 bank/corpus/manifest
   fetch-sources.sh       重新下载公开源材料
+  fetch-external.sh      下载 14 个扩展学习站（放大 .cache/external）
+  ingest/external-*.mjs  扩展题库/知识点导入与题图本地化
+
+> 扩展题库入口：`/bank`；扩展知识点入口：`/knowledge`。
   classify-math.mjs      数学题章节分类（可选）
 ```
 
@@ -96,6 +106,9 @@ scripts/
 | 英语二 | 2010—2026 | 816（48 题/年） |
 | 数学二 | 2006—2026 | 478 |
 | 408 | 2009—2026 | 846 |
+| 408 扩展 | 题库整理 | 2798 | 408 1000题 + 408 带学站章末习题 |
+| 数学二扩展 | 题库整理 | 1741 | 三大计算 + 张宇 1000题（按数二筛选）+ Kira 图片题 |
+| 扩展知识点 | 408/数学/英语 | 10975 | 408 讲义、张宇基础30讲、英语长难句、9404 词 |
 
 重建数据（需要原始材料已在 `data/raw/`）：
 
@@ -110,6 +123,13 @@ bash scripts/fetch-sources.sh
 npm run data:build
 ```
 
+重新抓取扩展学习站并重建扩展题库/知识点（图片会复制到 `public/assets/external`）：
+
+```bash
+bash scripts/fetch-external.sh
+npm run data:external
+```
+
 ## 组卷与批改是怎么工作的
 
 1. **组卷**：按所选章节从 `data/bank/*.json` 抽 3 道真题作为风格参考（不直接照抄），把 2027 大纲的题型结构、分值、章节要求、学生近期薄弱点一起送入模型。
@@ -122,7 +142,7 @@ npm run data:build
 ## 已知限制
 
 - 模型生成题可能出错（答案、计算、表述），请以教材/真题为准；重要结论建议对照真题库。
-- 真题材料来自公开整理，存在 OCR/回忆版误差；408 部分题图未随文本保存。
+- 真题材料来自公开整理，存在 OCR/回忆版误差；扩展题图已保存到 `public/assets/external`，但图片题仍可能需要人工核对原图。
 - 英语二参考译文与写作范文为 AI 生成，不是官方答案。
 - 当前为双账号、应用内登录；游客只能进入 1v1。请勿在去掉登录保护后直接公开 API。
 - 生成整卷（尤其英语二 48 题）耗时较长，建议先用快速一组。

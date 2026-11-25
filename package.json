@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "data:build": "node scripts/build-data.mjs"
+    "data:build": "node scripts/build-data.mjs",
+    "data:external": "node scripts/ingest/external-banks.mjs && node scripts/ingest/external-knowledge.mjs"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

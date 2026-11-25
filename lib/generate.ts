@@ -1,6 +1,7 @@
 import { chatJson } from "./deepseek";
 import { buildGenerationMessages } from "./prompts";
 import { corpusExcerpt, selectExemplars } from "./retrieval";
+import { knowledgeExcerpt } from "./knowledge";
 import { createPaper, getRecentStems, getWeakChapters, type GeneratedQuestion, type GeneratedSection } from "./queries";
 import { chapterById, chapterNames, flattenChapters, getMode, getSubject } from "./subjects";
 import type { PracticeMode, QuestionPlan, SubjectChapter, SubjectConfig, SubjectId } from "./types";
@@ -257,8 +258,9 @@ export async function generatePaper(input: {
   const results = await mapLimit(tasks, 3, async (task) => {
     const exemplars = selectExemplars(subject.id, task.chapters, 3);
     const englishExcerpt = subject.id === "english2" ? corpusExcerpt(subject.id, task.chapters[0] || "", task.seedYear) : "";
+    const knowledge = knowledgeExcerpt(subject.id, task.chapters.join(" "), 2, 700);
     const messages = buildGenerationMessages({
-      subject, mode, chapterNames: task.chapters, exemplars, englishExcerpt, weakTopics, avoid,
+      subject, mode, chapterNames: task.chapters, exemplars, englishExcerpt, knowledgeExcerpt: knowledge, weakTopics, avoid,
       planOverride: [task.plan], labelHint: task.labelHint,
     });
     let lastErr: unknown = null;

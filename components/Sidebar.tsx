@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, PenLine, Library, History, BookmarkX, Settings, Compass, Flame, ChevronRight,
-  Dices, Gamepad2, LogOut, UserRound, MessageCircle,
+  Dices, Gamepad2, LogOut, UserRound, MessageCircle, BookOpen, Layers,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { SUBJECTS , subjectTint } from "@/lib/subjects";
@@ -18,6 +18,8 @@ const NAV = [
   { href: "/tutor", label: "答疑", icon: MessageCircle },
   { href: "/match", label: "1v1 比赛", icon: Gamepad2 },
   { href: "/corpus", label: "真题库", icon: Library },
+  { href: "/knowledge", label: "知识点", icon: BookOpen },
+  { href: "/bank", label: "扩展题库", icon: Layers },
   { href: "/history", label: "练习记录", icon: History },
   { href: "/mistakes", label: "错题本", icon: BookmarkX },
   { href: "/syllabus", label: "2027 大纲", icon: Compass },
