@@ -7,6 +7,7 @@ import type { GeneratedRandomQuestion, RandomQuestionPublic } from "./random-typ
 
 const FIGURE_REF = /(?:如图|如下图|下图|上图|图所示|图示|见图|题图|图\s*\d)/;
 const IMAGE_MD = /!\[[^\]]*\]\([^)]+\)|<img\b/i;
+const OFF_SYLLABUS_MATH2 = /概率论|概率|随机变量|分布函数|数字特征|数学期望|期望|方差|协方差|泊松|正态分布|大数定律|数理统计|参数估计|假设检验|无穷级数|傅里叶|三重积分|曲线积分|曲面积分|空间解析几何|场论|伯努利方程|欧拉方程/;
 
 interface RawRandomQuestion {
   chapter?: string;
@@ -28,6 +29,10 @@ function hasFigureWithoutImage(stem: string, options: string[]): boolean {
   return !IMAGE_MD.test(text);
 }
 
+export function isRandomQuestionOnSyllabus(subjectId: string, text: string): boolean {
+  return !(subjectId === "math2" && OFF_SYLLABUS_MATH2.test(text));
+}
+
 function normalize(raw: RawRandomQuestion, subjectId: string, subjectName: string, chapter: string): GeneratedRandomQuestion | null {
   const stem = clean(raw.stem, 1600);
   const options = (raw.options || []).map((o, i) => ({
@@ -35,13 +40,14 @@ function normalize(raw: RawRandomQuestion, subjectId: string, subjectName: strin
     text: clean(o.text, 500),
   })).filter(o => /^[A-D]$/.test(o.key) && o.text.length >= 1);
   const answer = clean(raw.answer, 4).toUpperCase().replace(/[^A-D]/g, "");
+  const topic = clean(raw.topic, 40) || chapter;
   if (!stem || stem.length < 8 || options.length !== 4 || !/^[A-D]$/.test(answer)) return null;
   if (new Set(options.map(o => o.key)).size !== 4) return null;
   if (new Set(options.map(o => o.text)).size !== 4) return null;
   if (hasFigureWithoutImage(stem, options.map(o => o.text))) return null;
+  if (!isRandomQuestionOnSyllabus(subjectId, `${stem} ${options.map(o => o.text).join(" ")} ${topic} ${chapter}`)) return null;
   const correct = options.find(o => o.key === answer);
   if (!correct) return null;
-  const topic = clean(raw.topic, 40) || chapter;
   return {
     id: newId("rg"),
     subject: subjectId,

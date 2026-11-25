@@ -218,7 +218,7 @@ function importSanda() {
 }
 
 // ---------- 张宇 1000 题（math1 source, filter to math2 chapters） ----------
-const ZHANGYU_SKIP = /概率|随机|统计|大数|参数估计|假设检验|测试卷|无穷级数|多元函数积分学的预备知识|多元函数积分学|空间解析几何|曲线积分|曲面积分|三重积分|傅里叶|场论|伯努利方程与欧拉方程/;
+const ZHANGYU_SKIP = /概率|随机|统计|大数|参数估计|假设检验|数字特征|期望|方差|分布|测试卷|无穷级数|多元函数积分学的预备知识|多元函数积分学|空间解析几何|曲线积分|曲面积分|三重积分|傅里叶|场论|伯努利方程与欧拉方程/;
 function chapterFromZhangyu(title) {
   return mapMathChapter(title);
 }
@@ -230,6 +230,9 @@ function importZhangyu() {
   for (const f of files) {
     const file = path.join(dir, "chapters", f);
     const $ = cheerio.load(fs.readFileSync(file, "utf8"), { decodeEntities: true });
+    const pageNo = Number((f.match(/\d+/) || [0])[0]);
+    // 张宇 1000 题是数学一题源；26-31、59-71 是概率/测试卷，数二不考。
+    if ((pageNo >= 26 && pageNo <= 31) || (pageNo >= 59 && pageNo <= 71)) continue;
     const topTitle = cleanText($(".top-title").text());
     const current = cleanText($(".toc-l3.cur").text()).replace(/^\d+\s*|\s*\d+题$/g, "").trim();
     const pageTitle = current || topTitle.replace(/（[^）]*）/g, "").replace(/^.*?·\s*/, "").trim();

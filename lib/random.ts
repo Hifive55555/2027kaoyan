@@ -3,7 +3,7 @@ import path from "node:path";
 import { getDb, newId, nowIso } from "./db";
 import { SUBJECTS } from "./subjects";
 import type { SubjectId } from "./types";
-import { generateRandomQuestion } from "./random-generate";
+import { generateRandomQuestion, isRandomQuestionOnSyllabus } from "./random-generate";
 import type { GeneratedRandomQuestion, RandomQuestionPublic } from "./random-types";
 
 type BankQuestion = {
@@ -39,6 +39,9 @@ function eligible(q: BankQuestion): boolean {
   if (!q.stem || !Array.isArray(q.options) || q.options.length < 2) return false;
   if (!q.options.every(o => String(o.text || "").trim().length > 1 && String(o.text).trim() !== ".")) return false;
   if (!["choice", "single"].includes(q.type)) return false;
+  const text = [q.stem, ...(q.options || []).map(o => o.text)].join(" ");
+  if (FIGURE_REF.test(text) && !IMAGE_MD.test(text)) return false;
+  if (!isRandomQuestionOnSyllabus(q.subject, `${text} ${q.chapter} ${q.topic || ""}`)) return false;
   return /^[A-D]$/.test(answerLetter(q));
 }
 
@@ -131,7 +134,10 @@ function generatedRow(userId: string, questionId: string): GeneratedRandomQuesti
     `SELECT payload FROM random_generated_questions WHERE id = ? AND user_id = ?`
   ).get(questionId, userId) as { payload: string } | undefined;
   if (!row) return null;
-  try { return JSON.parse(row.payload) as GeneratedRandomQuestion; } catch { return null; }
+  try {
+    const q = JSON.parse(row.payload) as GeneratedRandomQuestion;
+    return isRandomQuestionOnSyllabus(q.subject, `${q.stem} ${q.options.map(o => o.text).join(" ")} ${q.chapter} ${q.topic}`) ? q : null;
+  } catch { return null; }
 }
 
 function takeGeneratedQuestion(userId: string, excludeId?: string): GeneratedRandomQuestion | null {
@@ -146,7 +152,10 @@ function takeGeneratedQuestion(userId: string, excludeId?: string): GeneratedRan
     `UPDATE random_generated_questions SET used_at = ? WHERE id = ? AND user_id = ? AND used_at IS NULL`
   ).run(nowIso(), row.id, userId);
   if (!claimed.changes) return null;
-  try { return JSON.parse(row.payload) as GeneratedRandomQuestion; } catch { return null; }
+  try {
+    const q = JSON.parse(row.payload) as GeneratedRandomQuestion;
+    return isRandomQuestionOnSyllabus(q.subject, `${q.stem} ${q.options.map(o => o.text).join(" ")} ${q.chapter} ${q.topic}`) ? q : null;
+  } catch { return null; }
 }
 
 function generatedReadyCount(userId: string): number {
