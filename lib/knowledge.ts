@@ -106,22 +106,6 @@ export function getKnowledgeEntry(id: string): KnowledgeEntry | null {
   return null;
 }
 
-function outlineOf(text: string, limit = 16): string[] {
-  const found: string[] = [];
-  const seen = new Set<string>();
-  const re = /(?:^|[\s。；])((?:\d+\.\d(?:\.\d+)?)|(?:\d+\.))\s*([^\s。；，,]{2,28})/g;
-  for (const match of text.matchAll(re)) {
-    const line = `${match[1]} ${match[2]}`.replace(/\s+/g, " ").trim();
-    if (line.length > 32 || seen.has(line)) continue;
-    if (/^[0-9]/.test(match[2]) || /^(?:图|表|展示|所示|给出|一个|所述|节|主题)/.test(match[2])) continue;
-    if (/所示|给出|展示|教材PDF|一个可能/.test(match[2])) continue;
-    seen.add(line);
-    found.push(line);
-    if (found.length >= limit) break;
-  }
-  return found;
-}
-
 function bestWindow(text: string, query: string, maxChars: number): string {
   const q = query.replace(/\s+/g, " ").trim();
   if (text.length <= maxChars) return text;
@@ -155,9 +139,5 @@ export function knowledgeExcerpt(subject: string | undefined, query: string, lim
   if (/目录结构|目录项/.test(query)) expansions.push("文件控制块 索引节点 FCB inode 单级目录 两级目录 树形目录");
   const expanded = [query, ...expansions].join(" ");
   const hits = searchKnowledge(expanded, { subject, limit });
-  return hits.map(e => {
-    const outline = e.kind === "vocab" ? [] : outlineOf(e.text);
-    const body = bestWindow(e.text.replace(/\s+/g, " "), expanded, maxChars);
-    return `- [${e.chapter}] ${e.title}（${e.source}）${outline.length ? `\n小节清单：${outline.join("；")}` : ""}\n${body}`;
-  }).join("\n\n");
+  return hits.map(e => `- [${e.chapter}] ${e.title}（${e.source}）\n${bestWindow(e.text.replace(/\s+/g, " "), expanded, maxChars)}`).join("\n\n");
 }
