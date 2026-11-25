@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     if (eventQuizId) {
       const quiz = getTutorQuizRaw(eventQuizId, auth.userId);
       if (!quiz || !quiz.attempt) return Response.json({ error: "答题记录不存在" }, { status: 404 });
-      const history = getTutorMessages(auth.userId, 80).map(m => ({ role: m.role, content: m.content }));
+      const history = getTutorMessages(auth.userId).map(m => ({ role: m.role, content: m.content }));
       const profile = buildLearnerProfile(auth.userId);
       const messages = buildTutorMessages({
         profileText: toLearnerPrompt(profile),
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
     if (eventCheckId) {
       const check = getTutorCheckRaw(eventCheckId, auth.userId);
       if (!check || !check.attempt) return Response.json({ error: "检查记录不存在" }, { status: 404 });
-      const history = getTutorMessages(auth.userId, 80).map(m => ({ role: m.role, content: m.content }));
+      const history = getTutorMessages(auth.userId).map(m => ({ role: m.role, content: m.content }));
       const profile = buildLearnerProfile(auth.userId);
       const messages = buildTutorMessages({
         profileText: toLearnerPrompt(profile),
@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
     if (!message) return Response.json({ error: "写点什么再问老师" }, { status: 400 });
 
     const userMessage = saveTutorMessage(auth.userId, "user", message);
-    const history = getTutorMessages(auth.userId, 80).map(m => ({ role: m.role, content: m.content }));
+    const history = getTutorMessages(auth.userId).map(m => ({ role: m.role, content: m.content }));
     const profile = buildLearnerProfile(auth.userId);
     const messages = buildTutorMessages({
       profileText: toLearnerPrompt(profile),

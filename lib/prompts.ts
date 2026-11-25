@@ -345,11 +345,11 @@ function normalizeTutorHistory(history: { role: "user" | "assistant" | "system";
     if (prev && prev.role === item.role) prev.content += `\n\n${item.content}`;
     else out.push({ role: item.role, content: item.content });
   }
-  const tail = out.slice(-14);
-  // DeepSeek requires the conversation to start with a user message; a
-  // window cut at an assistant turn would otherwise produce a 400.
-  while (tail.length && tail[0].role !== "user") tail.shift();
-  return tail;
+  // Keep the full conversation. Do not cut the history at an arbitrary
+  // message count: older context matters and a stable prefix also helps
+  // provider-side KV/prefix cache reuse.
+  while (out.length && out[0].role !== "user") out.shift();
+  return out;
 }
 
 export interface TutorQuizDraft {

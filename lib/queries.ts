@@ -667,10 +667,11 @@ export function deleteTutorMessage(userId: string, id: string) {
   getDb().prepare(`DELETE FROM tutor_messages WHERE id = ? AND user_id = ?`).run(id, userId);
 }
 
-export function getTutorMessages(userId: string, limit = 80): TutorMessage[] {
-  const rows = getDb().prepare(
-    `SELECT * FROM tutor_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`
-  ).all(userId, limit) as Row[];
+export function getTutorMessages(userId: string, limit?: number): TutorMessage[] {
+  const db = getDb();
+  const rows = (limit
+    ? db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`).all(userId, limit)
+    : db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? ORDER BY created_at DESC`).all(userId)) as Row[];
   return rows.reverse().map(row => ({
     id: row.id,
     role: row.role === "assistant" ? "assistant" as const : row.role === "system" ? "system" as const : "user" as const,

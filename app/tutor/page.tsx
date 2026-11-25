@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function TutorPage() {
   const session = await requireUserPage();
   const profile = buildLearnerProfile(session.userId!);
-  const messages = getTutorMessages(session.userId!, 80);
+  const messages = getTutorMessages(session.userId!);
   const roadmap = getTutorRoadmap(session.userId!);
   return (
     <AppShell>
