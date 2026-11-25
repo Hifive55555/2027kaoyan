@@ -131,7 +131,7 @@ export function getTutorRetrievalContext(userId: string, conversationId: string,
   all.sort((a, b) => b.score - a.score || b.q.year - a.q.year);
   const hits = all.slice(0, 60);
   if (!hits.length) {
-    const knowledge = knowledgeExcerpt(undefined, query, 3, 420);
+    const knowledge = knowledgeExcerpt(undefined, query, 3, 620);
     return `【本地题库检索】未找到明确匹配的历年题。不要据此断言“没有考过”；可提示用户换关键词或联网搜索。${knowledge ? `\n【本地知识点检索（自动）】\n${knowledge}` : ""}`;
   }
   const byYear = new Map<number, number>();
@@ -144,7 +144,7 @@ export function getTutorRetrievalContext(userId: string, conversationId: string,
     return `- ${label} [${SUBJECT_LABEL[q.subject] || q.subject}·${q.chapter || ""}] ${compact(q.stem, 120)}${ans ? `（答案：${ans}）` : ""}`;
   }).join("\n");
   const syllabus = syllabusExcerpts(terms);
-  const knowledge = knowledgeExcerpt(undefined, query, 2, 420);
+  const knowledge = knowledgeExcerpt(undefined, query, 3, 620);
   return `【本地题库检索（自动）】
 匹配 ${all.length} 道；年份分布：${years || "无"}。
 代表题：

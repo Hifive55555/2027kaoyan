@@ -106,7 +106,56 @@ export function getKnowledgeEntry(id: string): KnowledgeEntry | null {
   return null;
 }
 
+function outlineOf(text: string, limit = 16): string[] {
+  const found: string[] = [];
+  const seen = new Set<string>();
+  const re = /(?:^|[\s。；])((?:\d+\.\d(?:\.\d+)?)|(?:\d+\.))\s*([^\s。；，,]{2,28})/g;
+  for (const match of text.matchAll(re)) {
+    const line = `${match[1]} ${match[2]}`.replace(/\s+/g, " ").trim();
+    if (line.length > 46 || seen.has(line)) continue;
+    seen.add(line);
+    found.push(line);
+    if (found.length >= limit) break;
+  }
+  return found;
+}
+
+function bestWindow(text: string, query: string, maxChars: number): string {
+  const q = query.replace(/\s+/g, " ").trim();
+  if (text.length <= maxChars) return text;
+  const terms = [q];
+  for (let n = Math.min(6, q.length); n >= 2; n--) {
+    for (let i = 0; i + n <= q.length; i++) {
+      const gram = q.slice(i, i + n);
+      if (/[\u4e00-\u9fa5]/.test(gram) || /^[a-z0-9+#.]+$/i.test(gram)) terms.push(gram);
+    }
+  }
+  const needles = [...new Set(terms)].filter(Boolean).sort((a, b) => b.length - a.length).slice(0, 16);
+  let bestAt = 0;
+  let bestScore = -1;
+  for (const needle of needles) {
+    let at = text.indexOf(needle);
+    while (at >= 0) {
+      const start = Math.max(0, at - Math.floor(maxChars * 0.28));
+      const window = text.slice(start, start + maxChars);
+      const score = needles.reduce((n, term) => n + (window.includes(term) ? term.length : 0), 0);
+      if (score > bestScore) { bestScore = score; bestAt = start; }
+      at = text.indexOf(needle, at + needle.length);
+    }
+  }
+  return `${bestAt > 0 ? "…" : ""}${text.slice(bestAt, bestAt + maxChars)}${bestAt + maxChars < text.length ? "…" : ""}`;
+}
+
 export function knowledgeExcerpt(subject: string | undefined, query: string, limit = 3, maxChars = 520): string {
-  const hits = searchKnowledge(query, { subject, limit });
-  return hits.map(e => `- [${e.chapter}] ${e.title}（${e.source}）\n${e.text.replace(/\s+/g, " ").slice(0, maxChars)}`).join("\n\n");
+  const expansions: string[] = [];
+  if (/空闲空间管理|空闲块管理|文件存储空间/.test(query)) expansions.push("文件存储空间管理 空闲表法 空闲链表法 位示图法 成组链接法");
+  if (/链接分配|文件物理结构/.test(query)) expansions.push("隐式链接 显式链接 FAT 簇 索引分配");
+  if (/目录结构|目录项/.test(query)) expansions.push("文件控制块 索引节点 FCB inode 单级目录 两级目录 树形目录");
+  const expanded = [query, ...expansions].join(" ");
+  const hits = searchKnowledge(expanded, { subject, limit });
+  return hits.map(e => {
+    const outline = e.kind === "vocab" ? [] : outlineOf(e.text);
+    const body = bestWindow(e.text.replace(/\s+/g, " "), expanded, maxChars);
+    return `- [${e.chapter}] ${e.title}（${e.source}）${outline.length ? `\n小节清单：${outline.join("；")}` : ""}\n${body}`;
+  }).join("\n\n");
 }
