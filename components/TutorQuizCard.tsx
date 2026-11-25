@@ -7,11 +7,12 @@ import { cn } from "@/lib/utils";
 import { Markdown } from "./Markdown";
 
 export function TutorQuizCard({
-  quiz, onUpdated, onAnswered,
+  quiz, onUpdated, onAnswered, readOnly = false,
 }: {
   quiz: TutorQuizPublic;
   onUpdated: (quiz: TutorQuizPublic) => void;
   onAnswered?: (quiz: TutorQuizPublic, systemMessage?: TutorMessage) => void;
+  readOnly?: boolean;
 }) {
   const [local, setLocal] = useState(quiz);
   const [selected, setSelected] = useState(quiz.attempt?.answer || "");
@@ -20,7 +21,7 @@ export function TutorQuizCard({
   const attempted = !!local.attempt;
 
   async function submit() {
-    if (!selected || busy || attempted) return;
+    if (!selected || busy || attempted || readOnly) return;
     setBusy(true);
     setError("");
     try {
@@ -58,7 +59,7 @@ export function TutorQuizCard({
               <button
                 key={option.key}
                 onClick={() => !attempted && setSelected(option.key)}
-                disabled={attempted || busy}
+                disabled={attempted || busy || readOnly}
                 className={cn(
                   "flex w-full items-start gap-2.5 rounded-lg border px-2.5 py-2 text-left text-[12px] leading-5 transition-colors",
                   !attempted && "hover:border-line-strong hover:bg-surface-2",
@@ -86,13 +87,13 @@ export function TutorQuizCard({
           <div className="mt-3 flex items-center gap-2">
             <button
               onClick={submit}
-              disabled={!selected || busy}
+              disabled={!selected || busy || readOnly}
               className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-ink px-3 text-[11px] font-medium text-paper disabled:opacity-40"
             >
               {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
               提交答案
             </button>
-            <span className="text-[9px] text-faint">作答后老师会接着讲</span>
+            <span className="text-[9px] text-faint">{readOnly ? "此对话已归档" : "作答后老师会接着讲"}</span>
           </div>
         ) : (
           <div className="mt-3 rounded-lg border border-line bg-surface-2 p-2.5">

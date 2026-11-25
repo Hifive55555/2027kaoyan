@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireUserApi } from "@/lib/auth";
-import { getTutorQuizRaw, saveTutorQuizAttempt, getTutorQuiz, saveTutorMessage } from "@/lib/queries";
+import { getTutorQuizRaw, saveTutorQuizAttempt, getTutorQuiz, saveTutorMessage, getTutorConversation, getTutorConversationForQuiz, getOrCreateActiveTutorConversation } from "@/lib/queries";
 
 export const runtime = "nodejs";
 
@@ -20,8 +20,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const correct = answer === String(quiz.answer).trim().toUpperCase();
     saveTutorQuizAttempt(auth.userId, id, answer, correct);
     const label = quiz.topic || quiz.chapter || "巩固题";
+    const conversationId = getTutorConversationForQuiz(auth.userId, id) || getOrCreateActiveTutorConversation(auth.userId).id;
+    if (getTutorConversation(auth.userId, conversationId)?.archivedAt) return Response.json({ error: "对话已归档，请先取消归档" }, { status: 409 });
     const systemMessage = saveTutorMessage(
       auth.userId,
+      conversationId,
       "system",
       `已完成巩固题「${label}」：选择 ${answer}，${correct ? "答对" : "答错"}。`
     );

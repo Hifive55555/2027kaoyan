@@ -6,11 +6,12 @@ import type { TutorCheckPublic, TutorMessage } from "@/lib/types";
 import { Markdown } from "./Markdown";
 
 export function TutorCheckCard({
-  check, onUpdated, onAnswered,
+  check, onUpdated, onAnswered, readOnly = false,
 }: {
   check: TutorCheckPublic;
   onUpdated: (check: TutorCheckPublic) => void;
   onAnswered?: (check: TutorCheckPublic, systemMessage?: TutorMessage) => void;
+  readOnly?: boolean;
 }) {
   const [local, setLocal] = useState(check);
   const [value, setValue] = useState(check.attempt?.response || "");
@@ -20,7 +21,7 @@ export function TutorCheckCard({
 
   async function submit(response: string) {
     const answer = response.trim();
-    if (!answer || busy || attempted) return;
+    if (!answer || busy || attempted || readOnly) return;
     setBusy(true);
     setError("");
     try {
@@ -60,7 +61,7 @@ export function TutorCheckCard({
               <button
                 key={option}
                 onClick={() => submit(option)}
-                disabled={busy}
+                disabled={busy || readOnly}
                 className="h-8 rounded-lg border border-line bg-surface px-3 text-[11px] text-muted transition-colors hover:border-brand/50 hover:bg-brand-soft/40 hover:text-ink disabled:opacity-50"
               >
                 {option}
@@ -74,12 +75,13 @@ export function TutorCheckCard({
               value={value}
               onChange={e => setValue(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submit(value); } }}
-              placeholder={local.placeholder || "填写你的答案"}
+              disabled={readOnly}
+              placeholder={readOnly ? "此对话已归档" : (local.placeholder || "填写你的答案")}
               className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[11px] outline-none placeholder:text-faint focus:border-brand/50"
             />
             <button
               onClick={() => submit(value)}
-              disabled={!value.trim() || busy}
+              disabled={!value.trim() || busy || readOnly}
               className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-ink px-3 text-[10px] font-medium text-paper disabled:opacity-40"
             >
               {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
@@ -87,6 +89,7 @@ export function TutorCheckCard({
             </button>
           </div>
         )}
+        {readOnly && !attempted && !error && <p className="mt-2 text-[10px] text-amber">此对话已归档，取消归档后可作答。</p>}
         {error && <p className="mt-2 text-[10px] text-accent">{error}</p>}
       </div>
     </div>

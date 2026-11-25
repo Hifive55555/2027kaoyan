@@ -16,7 +16,12 @@ import {
   getTutorQuizRaw,
   getTutorRoadmap,
   getTutorRoadmapText,
+  getTutorConversation,
+  getTutorConversationForCheck,
+  getTutorConversationForQuiz,
+  getOrCreateActiveTutorConversation,
   saveTutorMessage,
+  titleTutorConversation,
 } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -51,6 +56,7 @@ function formatSources(annotations: any[]): string {
 
 function streamTutorReply(input: {
   userId: string;
+  conversationId: string;
   messages: ChatMessageInput[];
   fallback: string;
   userMessageId?: string;
@@ -78,23 +84,24 @@ function streamTutorReply(input: {
 
         const finalized = finalizeTutorReply(input.userId, full, input.fallback);
         const replyWithSources = finalized.reply + formatSources(sources);
-        const assistant = saveTutorMessage(input.userId, "assistant", replyWithSources, undefined, finalized.checkId);
+        const assistant = saveTutorMessage(input.userId, input.conversationId, "assistant", replyWithSources, undefined, finalized.checkId);
         let quizMessage = null;
 
         const wantsQuiz = !finalized.checkId && (finalized.markerQuiz || input.explicitQuiz || finalized.implicitQuiz);
         if (wantsQuiz) {
-          const recent = getTutorMessages(input.userId, 12);
+          const recent = getTutorMessages(input.userId, input.conversationId, 12);
           const lastQuiz = [...recent].reverse().find(m => m.quiz);
           const hasPendingQuiz = !!lastQuiz?.quiz && !lastQuiz.quiz.attempt;
           if (!hasPendingQuiz) {
             try {
-              quizMessage = await generateTutorQuizMessage(input.userId);
+              quizMessage = await generateTutorQuizMessage(input.userId, input.conversationId);
             } catch (err) {
               console.error("[tutor] auto quiz failed:", err);
             }
           }
         }
 
+        const conversation = getTutorConversation(input.userId, input.conversationId);
         send({
           done: true,
           message: {
@@ -102,6 +109,8 @@ function streamTutorReply(input: {
             check: finalized.checkId ? getTutorCheck(finalized.checkId, input.userId) : undefined,
           },
           roadmap: finalized.roadmap,
+          conversationId: input.conversationId,
+          conversationTitle: conversation?.title,
           extraMessages: quizMessage ? [quizMessage] : [],
         });
       } catch (err) {
@@ -132,7 +141,10 @@ export async function POST(req: NextRequest) {
     if (eventQuizId) {
       const quiz = getTutorQuizRaw(eventQuizId, auth.userId);
       if (!quiz || !quiz.attempt) return Response.json({ error: "答题记录不存在" }, { status: 404 });
-      const history = getTutorMessages(auth.userId).map(m => ({ role: m.role, content: m.content }));
+      const conversationId = String(body.conversationId || "") || getTutorConversationForQuiz(auth.userId, eventQuizId);
+      const conversation = conversationId ? getTutorConversation(auth.userId, conversationId) : null;
+      if (!conversation || conversation.archivedAt) return Response.json({ error: "对话不存在或已归档" }, { status: 409 });
+      const history = getTutorMessages(auth.userId, conversation.id).map(m => ({ role: m.role, content: m.content }));
       const profile = buildLearnerProfile(auth.userId);
       const messages = buildTutorMessages({
         profileText: toLearnerPrompt(profile),
@@ -152,6 +164,7 @@ export async function POST(req: NextRequest) {
       });
       return streamTutorReply({
         userId: auth.userId,
+        conversationId: conversation.id,
         messages,
         fallback: "我们先停一下。你觉得自己刚才那一步的关键是什么？",
       });
@@ -161,7 +174,10 @@ export async function POST(req: NextRequest) {
     if (eventCheckId) {
       const check = getTutorCheckRaw(eventCheckId, auth.userId);
       if (!check || !check.attempt) return Response.json({ error: "检查记录不存在" }, { status: 404 });
-      const history = getTutorMessages(auth.userId).map(m => ({ role: m.role, content: m.content }));
+      const conversationId = String(body.conversationId || "") || getTutorConversationForCheck(auth.userId, eventCheckId);
+      const conversation = conversationId ? getTutorConversation(auth.userId, conversationId) : null;
+      if (!conversation || conversation.archivedAt) return Response.json({ error: "对话不存在或已归档" }, { status: 409 });
+      const history = getTutorMessages(auth.userId, conversation.id).map(m => ({ role: m.role, content: m.content }));
       const profile = buildLearnerProfile(auth.userId);
       const messages = buildTutorMessages({
         profileText: toLearnerPrompt(profile),
@@ -179,6 +195,7 @@ export async function POST(req: NextRequest) {
       });
       return streamTutorReply({
         userId: auth.userId,
+        conversationId: conversation.id,
         messages,
         fallback: "我们先停一下。你觉得自己刚才那一步的关键是什么？",
       });
@@ -186,9 +203,16 @@ export async function POST(req: NextRequest) {
 
     const message = String(body.message || "").trim().slice(0, 2000);
     if (!message) return Response.json({ error: "写点什么再问老师" }, { status: 400 });
+    const requestedConversation = String(body.conversationId || "");
+    const conversation = requestedConversation
+      ? getTutorConversation(auth.userId, requestedConversation)
+      : getOrCreateActiveTutorConversation(auth.userId);
+    if (!conversation) return Response.json({ error: "对话不存在" }, { status: 404 });
+    if (conversation.archivedAt) return Response.json({ error: "对话已归档，请先取消归档" }, { status: 409 });
 
-    const userMessage = saveTutorMessage(auth.userId, "user", message);
-    const history = getTutorMessages(auth.userId).map(m => ({ role: m.role, content: m.content }));
+    const userMessage = saveTutorMessage(auth.userId, conversation.id, "user", message);
+    titleTutorConversation(auth.userId, conversation.id, message);
+    const history = getTutorMessages(auth.userId, conversation.id).map(m => ({ role: m.role, content: m.content }));
     const profile = buildLearnerProfile(auth.userId);
     const messages = buildTutorMessages({
       profileText: toLearnerPrompt(profile),
@@ -200,6 +224,7 @@ export async function POST(req: NextRequest) {
       && !/(?:别|不要|不用|先不|不想).{0,6}出题/.test(message);
     return streamTutorReply({
       userId: auth.userId,
+      conversationId: conversation.id,
       messages,
       fallback: "我先不急着讲完整。你能说说自己目前卡在哪一步吗？",
       userMessageId: userMessage.id,

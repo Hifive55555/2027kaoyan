@@ -5,12 +5,13 @@ import {
   AlertCircle, BookOpen, CheckCircle2, ChevronDown, GraduationCap, Lightbulb, Loader2, MessageCircle,
   RotateCcw, Send, Sparkles, Target, TrendingUp,
 } from "lucide-react";
-import type { LearnerProfile, TutorCheckPublic, TutorMessage, TutorQuizPublic, TutorRoadmapItem } from "@/lib/types";
+import type { LearnerProfile, TutorCheckPublic, TutorConversationPublic, TutorMessage, TutorQuizPublic, TutorRoadmapItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Markdown } from "./Markdown";
 import { TutorQuizCard } from "./TutorQuizCard";
 import { TutorCheckCard } from "./TutorCheckCard";
 import { TutorRoadmap } from "./TutorRoadmap";
+import { TutorConversationModal } from "./TutorConversationModal";
 
 function pct(n: number) {
   return `${Math.round(n)}%`;
@@ -29,14 +30,16 @@ function subjectName(id: string) {
 }
 
 export function TutorClient({
-  initialMessages, initialProfile, initialGoal, initialRoadmap, suggestions,
+  initialConversation, initialMessages, initialProfile, initialGoal, initialRoadmap, suggestions,
 }: {
+  initialConversation: TutorConversationPublic;
   initialMessages: TutorMessage[];
   initialProfile: LearnerProfile;
   initialGoal: string;
   initialRoadmap: TutorRoadmapItem[];
   suggestions: string[];
 }) {
+  const [conversation, setConversation] = useState(initialConversation);
   const [messages, setMessages] = useState(initialMessages);
   const [profile, setProfile] = useState(initialProfile);
   const [goal, setGoal] = useState(initialGoal);
@@ -46,10 +49,10 @@ export function TutorClient({
   const [loading, setLoading] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [quizBusy, setQuizBusy] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
   const [error, setError] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
+  const [conversationOpen, setConversationOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -147,6 +150,7 @@ export function TutorClient({
               ...(Array.isArray(data.extraMessages) ? data.extraMessages : []),
             ]);
             if (data.roadmap) setRoadmap(data.roadmap);
+            if (data.conversationTitle) setConversation(prev => ({ ...prev, title: data.conversationTitle }));
           }
         }
       }
@@ -174,7 +178,14 @@ export function TutorClient({
       createdAt: new Date().toISOString(),
     };
     setMessages(prev => [...prev, optimistic]);
-    await runTutorStream({ message: content }, { removeIds: [optimistic.id], restoreInput: content });
+    await runTutorStream({ message: content, conversationId: conversation.id }, { removeIds: [optimistic.id], restoreInput: content });
+  }
+
+  async function newConversation() {
+    const res = await fetch("/api/tutor/conversations", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok || !data.conversation) throw new Error(data.error || "创建对话失败");
+    window.location.href = `/tutor?c=${data.conversation.id}`;
   }
 
   async function makeQuiz() {
@@ -185,7 +196,7 @@ export function TutorClient({
       const res = await fetch("/api/tutor/quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ conversationId: conversation.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "出题失败");
@@ -195,23 +206,6 @@ export function TutorClient({
       setError(err instanceof Error ? err.message : "出题失败");
     } finally {
       setQuizBusy(false);
-    }
-  }
-
-  async function reset() {
-    if (resetting || loading) return;
-    if (messages.length && !window.confirm("清空当前对话？学习档案和做过的题不会删除。")) return;
-    setResetting(true);
-    setError("");
-    try {
-      const res = await fetch("/api/tutor/reset", { method: "POST" });
-      if (!res.ok) throw new Error("清空失败");
-      setMessages([]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "清空失败");
-    } finally {
-      setResetting(false);
-      inputRef.current?.focus();
     }
   }
 
@@ -244,11 +238,11 @@ export function TutorClient({
   }
 
   async function followUpOnCheck(check: TutorCheckPublic) {
-    await runTutorStream({ eventCheckId: check.id });
+    await runTutorStream({ eventCheckId: check.id, conversationId: conversation.id });
   }
 
   async function followUpOnQuiz(quiz: TutorQuizPublic) {
-    await runTutorStream({ eventQuizId: quiz.id });
+    await runTutorStream({ eventQuizId: quiz.id, conversationId: conversation.id });
   }
 
   return (
@@ -258,7 +252,12 @@ export function TutorClient({
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-muted">
             <GraduationCap className="h-3.5 w-3.5 text-brand" /> One-on-one tutor
           </div>
-          <h1 className="mt-2 font-serif text-[28px] leading-tight sm:text-[34px]">答疑</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <h1 className="font-serif text-[28px] leading-tight sm:text-[34px]">答疑</h1>
+            <button onClick={() => setConversationOpen(true)} className="inline-flex max-w-[300px] items-center gap-1 rounded-lg border border-line bg-surface px-2.5 py-1 text-[10px] text-muted hover:border-line-strong hover:text-ink">
+              <MessageCircle className="h-3 w-3 shrink-0" /> <span className="truncate">{conversation.title}</span> <ChevronDown className="h-3 w-3 shrink-0" />
+            </button>
+          </div>
           <p className="mt-1 max-w-xl text-[12px] leading-6 text-muted">
             带着疑问来。老师会先找到你卡住的那一步，再一小步一小步带你走；需要时会直接出一道题让你巩固。
           </p>
@@ -272,19 +271,18 @@ export function TutorClient({
           </button>
           <button
             onClick={makeQuiz}
-            disabled={quizBusy || loading}
+            disabled={quizBusy || loading || !!conversation.archivedAt}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-brand/30 bg-brand-soft px-2.5 text-[10px] text-brand hover:border-brand/60 disabled:opacity-40"
           >
             {quizBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Lightbulb className="h-3 w-3" />}
             {quizBusy ? "出题中…" : "出题巩固"}
           </button>
           <button
-            onClick={reset}
-            disabled={resetting || loading}
+            onClick={() => { newConversation().catch(err => setError(err instanceof Error ? err.message : "创建对话失败")); }}
+            disabled={loading}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[10px] text-muted hover:border-line-strong hover:text-ink disabled:opacity-40"
           >
-            {resetting ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
-            新对话
+            <RotateCcw className="h-3 w-3" /> 新对话
           </button>
         </div>
       </div>
@@ -292,6 +290,15 @@ export function TutorClient({
       <div className="mt-4 shrink-0 lg:hidden">
         <TutorRoadmap items={roadmap} busyId={roadmapBusy} onToggle={toggleRoadmap} />
       </div>
+
+      <TutorConversationModal
+        open={conversationOpen}
+        activeId={conversation.id}
+        onClose={() => setConversationOpen(false)}
+        onSelect={id => { setConversationOpen(false); window.location.href = `/tutor?c=${id}`; }}
+        onNew={newConversation}
+        onArchived={id => { if (id === conversation.id) window.location.href = "/tutor"; }}
+      />
 
       <div className="mt-5 grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <section className="flex h-[calc(100dvh-340px)] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(31,29,25,0.04)] lg:h-full lg:min-h-0">
@@ -348,6 +355,7 @@ export function TutorClient({
                           {message.quiz && (
                             <TutorQuizCard
                               quiz={message.quiz}
+                              readOnly={!!conversation.archivedAt}
                               onUpdated={updateQuiz}
                               onAnswered={(quiz, systemMessage) => { updateQuiz(quiz); if (systemMessage) setMessages(prev => [...prev, systemMessage]); followUpOnQuiz(quiz); }}
                             />
@@ -355,6 +363,7 @@ export function TutorClient({
                           {message.check && (
                             <TutorCheckCard
                               check={message.check}
+                              readOnly={!!conversation.archivedAt}
                               onUpdated={updateCheck}
                               onAnswered={(check, systemMessage) => { updateCheck(check); if (systemMessage) setMessages(prev => [...prev, systemMessage]); followUpOnCheck(check); }}
                             />
@@ -382,6 +391,12 @@ export function TutorClient({
             )}
           </div>
 
+          {conversation.archivedAt && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-amber/20 bg-amber-soft px-4 py-2 text-[10px] text-amber">
+              此对话已归档，取消归档后才能继续提问。
+              <button onClick={() => setConversationOpen(true)} className="rounded-full border border-amber/30 px-2 py-0.5 hover:border-amber/60">管理对话</button>
+            </div>
+          )}
           <div className="border-t border-line bg-sand px-3 py-3 sm:px-4">
             <div className="flex items-end gap-2 rounded-xl border border-line bg-surface p-2">
               <textarea
@@ -392,12 +407,13 @@ export function TutorClient({
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
                 }}
                 rows={2}
-                placeholder="写出你的疑问，越具体越好… Enter 发送，Shift+Enter 换行"
+                disabled={!!conversation.archivedAt}
+                placeholder={conversation.archivedAt ? "对话已归档，请先取消归档" : "写出你的疑问，越具体越好… Enter 发送，Shift+Enter 换行"}
                 className="max-h-32 min-h-[42px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[12px] leading-5 outline-none placeholder:text-faint"
               />
               <button
                 onClick={() => send()}
-                disabled={loading || !input.trim()}
+                disabled={loading || !input.trim() || !!conversation.archivedAt}
                 className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink text-paper disabled:opacity-40"
                 aria-label="发送"
               >

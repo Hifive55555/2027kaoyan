@@ -51,6 +51,26 @@ function seedUsers(db: DatabaseSync) {
   }
 }
 
+function migrateTutorConversations(db: DatabaseSync) {
+  const users = db.prepare(
+    `SELECT DISTINCT user_id FROM tutor_messages WHERE conversation_id IS NULL AND user_id IS NOT NULL`
+  ).all() as { user_id: string }[];
+  for (const { user_id } of users) {
+    let conv = db.prepare(`SELECT id FROM tutor_conversations WHERE user_id = ? ORDER BY created_at LIMIT 1`).get(user_id) as { id: string } | undefined;
+    if (!conv) {
+      const first = db.prepare(`SELECT content FROM tutor_messages WHERE user_id = ? AND role = 'user' ORDER BY created_at LIMIT 1`).get(user_id) as { content: string } | undefined;
+      const title = String(first?.content || "历史对话").replace(/\s+/g, " ").trim().slice(0, 28) || "历史对话";
+      const id = `tc_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+      const now = new Date().toISOString();
+      db.prepare(`INSERT INTO tutor_conversations (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
+        .run(id, user_id, title, now, now);
+      conv = { id };
+    }
+    db.prepare(`UPDATE tutor_messages SET conversation_id = ? WHERE user_id = ? AND conversation_id IS NULL`)
+      .run(conv.id, user_id);
+  }
+}
+
 function migrate(db: DatabaseSync) {
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -157,6 +177,15 @@ function migrate(db: DatabaseSync) {
       file_name TEXT,
       created_at TEXT NOT NULL,
       expires_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS tutor_conversations (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '新的对话',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS tutor_messages (
@@ -308,6 +337,7 @@ function migrate(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_random_user ON random_attempts(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_random_messages ON random_messages(user_id, question_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_tutor_messages_user ON tutor_messages(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_tutor_conversations_user ON tutor_conversations(user_id, updated_at);
     CREATE INDEX IF NOT EXISTS idx_tutor_quizzes_user ON tutor_quizzes(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_tutor_attempts_user ON tutor_quiz_attempts(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_tutor_checks_user ON tutor_checks(user_id, created_at);
@@ -323,6 +353,9 @@ function migrate(db: DatabaseSync) {
   addColumn(db, "attempts", "user_id", "TEXT");
   addColumn(db, "messages", "user_id", "TEXT");
   addColumn(db, "tutor_messages", "check_id", "TEXT");
+  addColumn(db, "tutor_messages", "conversation_id", "TEXT");
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_tutor_messages_conversation ON tutor_messages(conversation_id, created_at);`);
+  migrateTutorConversations(db);
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_papers_user ON papers(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_attempts_user ON attempts(user_id, created_at);

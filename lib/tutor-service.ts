@@ -10,8 +10,8 @@ import {
 } from "./queries";
 import type { TutorMessage } from "./types";
 
-export async function generateTutorQuizMessage(userId: string, topic?: string): Promise<TutorMessage> {
-  const history = getTutorMessages(userId, 20)
+export async function generateTutorQuizMessage(userId: string, conversationId: string, topic?: string): Promise<TutorMessage> {
+  const history = getTutorMessages(userId, conversationId, 20)
     .filter(m => m.role !== "system")
     .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
   const profile = buildLearnerProfile(userId);
@@ -25,6 +25,7 @@ export async function generateTutorQuizMessage(userId: string, topic?: string): 
   const quizId = createTutorQuiz(userId, quiz);
   const assistant = saveTutorMessage(
     userId,
+    conversationId,
     "assistant",
     "好，我们做一道题巩固一下。先自己选，选完我再根据你的答案接着讲。",
     quizId

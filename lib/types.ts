@@ -241,3 +241,14 @@ export interface TutorRoadmapItem {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface TutorConversationPublic {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+  messageCount: number;
+  lastMessage: string;
+  lastMessageAt: string | null;
+}

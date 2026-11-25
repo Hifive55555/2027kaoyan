@@ -9,6 +9,7 @@ import type {
   SectionPublic,
   SubjectId,
   TutorCheckPublic,
+  TutorConversationPublic,
   TutorMessage,
   TutorQuizPublic,
   TutorRoadmapItem,
@@ -655,11 +656,13 @@ export function getTutorQuizRaw(id: string, userId: string): (TutorQuizPublic & 
   return { ...quiz, answer: parseJson(row.answer, ""), explanation: row.explanation || "" };
 }
 
-export function saveTutorMessage(userId: string, role: "user" | "assistant" | "system", content: string, quizId?: string, checkId?: string): TutorMessage {
+export function saveTutorMessage(userId: string, conversationId: string, role: "user" | "assistant" | "system", content: string, quizId?: string, checkId?: string): TutorMessage {
   const id = newId("tm");
   const createdAt = nowIso();
-  getDb().prepare(`INSERT INTO tutor_messages (id, user_id, role, content, quiz_id, check_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, userId, role, content, quizId || null, checkId || null, createdAt);
+  getDb().prepare(`INSERT INTO tutor_messages (id, user_id, conversation_id, role, content, quiz_id, check_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, userId, conversationId, role, content, quizId || null, checkId || null, createdAt);
+  getDb().prepare(`UPDATE tutor_conversations SET updated_at = ? WHERE id = ? AND user_id = ?`)
+    .run(createdAt, conversationId, userId);
   return { id, role, content, createdAt };
 }
 
@@ -667,11 +670,11 @@ export function deleteTutorMessage(userId: string, id: string) {
   getDb().prepare(`DELETE FROM tutor_messages WHERE id = ? AND user_id = ?`).run(id, userId);
 }
 
-export function getTutorMessages(userId: string, limit?: number): TutorMessage[] {
+export function getTutorMessages(userId: string, conversationId: string, limit?: number): TutorMessage[] {
   const db = getDb();
   const rows = (limit
-    ? db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`).all(userId, limit)
-    : db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? ORDER BY created_at DESC`).all(userId)) as Row[];
+    ? db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? ORDER BY created_at DESC LIMIT ?`).all(userId, conversationId, limit)
+    : db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? ORDER BY created_at DESC`).all(userId, conversationId)) as Row[];
   return rows.reverse().map(row => ({
     id: row.id,
     role: row.role === "assistant" ? "assistant" as const : row.role === "system" ? "system" as const : "user" as const,
@@ -895,4 +898,105 @@ export function setTutorRoadmapStatus(userId: string, id: string, status: "pendi
   getDb().prepare(`UPDATE tutor_roadmap SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
     .run(status, nowIso(), id, userId);
   return getTutorRoadmap(userId);
+}
+
+
+export function getTutorConversation(userId: string, id: string): TutorConversationPublic | null {
+  const db = getDb();
+  const row = db.prepare(`SELECT * FROM tutor_conversations WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
+  if (!row) return null;
+  const stat = db.prepare(`SELECT COUNT(*) AS n, MAX(created_at) AS last_at FROM tutor_messages WHERE conversation_id = ? AND user_id = ?`).get(id, userId) as Row;
+  const last = db.prepare(`SELECT content FROM tutor_messages WHERE conversation_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1`).get(id, userId) as Row | undefined;
+  return {
+    id: row.id,
+    title: row.title || "新的对话",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    archivedAt: row.archived_at || null,
+    messageCount: Number(stat?.n) || 0,
+    lastMessage: last?.content || "",
+    lastMessageAt: stat?.last_at || null,
+  };
+}
+
+export function createTutorConversation(userId: string, title = "新的对话"): TutorConversationPublic {
+  const id = newId("tconv");
+  const now = nowIso();
+  getDb().prepare(`INSERT INTO tutor_conversations (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
+    .run(id, userId, title.slice(0, 60) || "新的对话", now, now);
+  return { id, title, createdAt: now, updatedAt: now, archivedAt: null, messageCount: 0, lastMessage: "", lastMessageAt: null };
+}
+
+export function getOrCreateActiveTutorConversation(userId: string, requestedId?: string): TutorConversationPublic {
+  if (requestedId) {
+    const requested = getTutorConversation(userId, requestedId);
+    if (requested) return requested;
+  }
+  const row = getDb().prepare(
+    `SELECT * FROM tutor_conversations WHERE user_id = ? AND archived_at IS NULL ORDER BY updated_at DESC LIMIT 1`
+  ).get(userId) as Row | undefined;
+  if (row) return getTutorConversation(userId, row.id)!;
+  return createTutorConversation(userId);
+}
+
+export function updateTutorConversation(userId: string, id: string, input: { title?: string; archived?: boolean }): TutorConversationPublic | null {
+  const conv = getTutorConversation(userId, id);
+  if (!conv) return null;
+  const db = getDb();
+  if (typeof input.title === "string" && input.title.trim()) {
+    db.prepare(`UPDATE tutor_conversations SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
+      .run(input.title.trim().slice(0, 60), nowIso(), id, userId);
+  }
+  if (typeof input.archived === "boolean") {
+    db.prepare(`UPDATE tutor_conversations SET archived_at = ? WHERE id = ? AND user_id = ?`)
+      .run(input.archived ? nowIso() : null, id, userId);
+  }
+  return getTutorConversation(userId, id);
+}
+
+export function listTutorConversations(userId: string, archived: boolean, query = ""): TutorConversationPublic[] {
+  const db = getDb();
+  const q = query.trim();
+  const like = `%${q}%`;
+  const rows = db.prepare(
+    `SELECT c.*,
+       (SELECT COUNT(*) FROM tutor_messages m WHERE m.conversation_id = c.id) AS message_count,
+       (SELECT content FROM tutor_messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+       (SELECT MAX(created_at) FROM tutor_messages m WHERE m.conversation_id = c.id) AS last_message_at
+     FROM tutor_conversations c
+     WHERE c.user_id = ?
+       AND ${archived ? "c.archived_at IS NOT NULL" : "c.archived_at IS NULL"}
+       ${q ? `AND (c.title LIKE ? OR EXISTS (SELECT 1 FROM tutor_messages m2 WHERE m2.conversation_id = c.id AND m2.content LIKE ?))` : ""}
+     ORDER BY c.updated_at DESC`
+  ).all(...(q ? [userId, like, like] : [userId])) as Row[];
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title || "新的对话",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    archivedAt: row.archived_at || null,
+    messageCount: Number(row.message_count) || 0,
+    lastMessage: row.last_message || "",
+    lastMessageAt: row.last_message_at || null,
+  }));
+}
+
+export function titleTutorConversation(userId: string, id: string, message: string) {
+  const row = getDb().prepare(`SELECT title FROM tutor_conversations WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
+  if (!row || row.title !== "新的对话") return;
+  const title = String(message || "").replace(/\s+/g, " ").trim().slice(0, 32);
+  if (title) {
+    getDb().prepare(`UPDATE tutor_conversations SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
+      .run(title, nowIso(), id, userId);
+  }
+}
+
+export function getTutorConversationForQuiz(userId: string, quizId: string): string | null {
+  const row = getDb().prepare(`SELECT conversation_id FROM tutor_messages WHERE quiz_id = ? AND user_id = ? AND conversation_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`).get(quizId, userId) as Row | undefined;
+  return row?.conversation_id || null;
+}
+
+export function getTutorConversationForCheck(userId: string, checkId: string): string | null {
+  const row = getDb().prepare(`SELECT conversation_id FROM tutor_messages WHERE check_id = ? AND user_id = ? AND conversation_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`).get(checkId, userId) as Row | undefined;
+  return row?.conversation_id || null;
 }

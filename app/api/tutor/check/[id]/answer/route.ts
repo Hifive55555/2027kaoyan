@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireUserApi } from "@/lib/auth";
-import { getTutorCheck, getTutorCheckRaw, saveTutorCheckAttempt, saveTutorMessage } from "@/lib/queries";
+import { getTutorCheck, getTutorCheckRaw, saveTutorCheckAttempt, saveTutorMessage, getTutorConversation, getTutorConversationForCheck, getOrCreateActiveTutorConversation } from "@/lib/queries";
 
 export const runtime = "nodejs";
 
@@ -22,8 +22,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     saveTutorCheckAttempt(auth.userId, id, response, correct);
     const label = check.prompt.length > 48 ? `${check.prompt.slice(0, 48)}…` : check.prompt;
     const outcome = correct === null ? "" : correct ? "（正确）" : "（与预期不同）";
+    const conversationId = getTutorConversationForCheck(auth.userId, id) || getOrCreateActiveTutorConversation(auth.userId).id;
+    if (getTutorConversation(auth.userId, conversationId)?.archivedAt) return Response.json({ error: "对话已归档，请先取消归档" }, { status: 409 });
     const systemMessage = saveTutorMessage(
       auth.userId,
+      conversationId,
       "system",
       `已完成快速检查「${label}」：回答 ${response}${outcome}。`
     );
