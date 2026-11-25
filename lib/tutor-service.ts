@@ -11,13 +11,15 @@ import {
 import type { TutorMessage } from "./types";
 
 export async function generateTutorQuizMessage(userId: string, topic?: string): Promise<TutorMessage> {
-  const history = getTutorMessages(userId, 20).map(m => ({ role: m.role, content: m.content }));
+  const history = getTutorMessages(userId, 20)
+    .filter(m => m.role !== "system")
+    .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
   const profile = buildLearnerProfile(userId);
   const raw = await chatJson<TutorQuizDraft>(buildTutorQuizMessages({
     profileText: toLearnerPrompt(profile),
     topic,
     history,
-  }), { maxTokens: 1500, temperature: 0.62, timeoutMs: 90000 });
+  }), { maxTokens: 3000, temperature: 0.62, timeoutMs: 180000, effort: "high" });
   const quiz = normalizeTutorQuiz(raw);
   if (!quiz) throw new Error("这次题目没有生成成功，再试一次");
   const quizId = createTutorQuiz(userId, quiz);

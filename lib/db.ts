@@ -182,6 +182,37 @@ function migrate(db: DatabaseSync) {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS tutor_roadmap (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      parent_id TEXT,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      sort INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS tutor_checks (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'yesno',
+      prompt TEXT NOT NULL,
+      options TEXT NOT NULL DEFAULT '[]',
+      answer TEXT NOT NULL DEFAULT '',
+      placeholder TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS tutor_check_attempts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      check_id TEXT NOT NULL,
+      response TEXT NOT NULL DEFAULT '',
+      correct INTEGER,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS tutor_quiz_attempts (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -279,6 +310,9 @@ function migrate(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_tutor_messages_user ON tutor_messages(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_tutor_quizzes_user ON tutor_quizzes(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_tutor_attempts_user ON tutor_quiz_attempts(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_tutor_checks_user ON tutor_checks(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_tutor_roadmap_user ON tutor_roadmap(user_id, parent_id, sort);
+    CREATE INDEX IF NOT EXISTS idx_tutor_check_attempts_user ON tutor_check_attempts(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_uploads_user ON uploads(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_upload_tickets_user ON upload_tickets(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_upload_tickets_expires ON upload_tickets(expires_at);
@@ -288,6 +322,7 @@ function migrate(db: DatabaseSync) {
   addColumn(db, "papers", "user_id", "TEXT");
   addColumn(db, "attempts", "user_id", "TEXT");
   addColumn(db, "messages", "user_id", "TEXT");
+  addColumn(db, "tutor_messages", "check_id", "TEXT");
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_papers_user ON papers(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_attempts_user ON attempts(user_id, created_at);

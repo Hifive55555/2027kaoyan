@@ -2,16 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  AlertCircle, BookOpen, ChevronDown, GraduationCap, Lightbulb, Loader2, MessageCircle,
+  AlertCircle, BookOpen, CheckCircle2, ChevronDown, GraduationCap, Lightbulb, Loader2, MessageCircle,
   RotateCcw, Send, Sparkles, Target, TrendingUp,
 } from "lucide-react";
-import type { LearnerProfile, TutorMessage, TutorQuizPublic } from "@/lib/types";
+import type { LearnerProfile, TutorCheckPublic, TutorMessage, TutorQuizPublic, TutorRoadmapItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Markdown } from "./Markdown";
 import { TutorQuizCard } from "./TutorQuizCard";
+import { TutorCheckCard } from "./TutorCheckCard";
+import { TutorRoadmap } from "./TutorRoadmap";
 
 function pct(n: number) {
   return `${Math.round(n)}%`;
+}
+
+function visibleTutorText(text: string) {
+  const marker = text.search(/\[\[(CHECK|QUIZ|ROADMAP)\]/i);
+  if (marker >= 0) return text.slice(0, marker).trimEnd();
+  const partial = text.lastIndexOf("[[");
+  if (partial >= 0 && text.length - partial < 16) return text.slice(0, partial).trimEnd();
+  return text;
 }
 
 function subjectName(id: string) {
@@ -19,18 +29,22 @@ function subjectName(id: string) {
 }
 
 export function TutorClient({
-  initialMessages, initialProfile, initialGoal, suggestions,
+  initialMessages, initialProfile, initialGoal, initialRoadmap, suggestions,
 }: {
   initialMessages: TutorMessage[];
   initialProfile: LearnerProfile;
   initialGoal: string;
+  initialRoadmap: TutorRoadmapItem[];
   suggestions: string[];
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [profile, setProfile] = useState(initialProfile);
   const [goal, setGoal] = useState(initialGoal);
+  const [roadmap, setRoadmap] = useState(initialRoadmap);
+  const [roadmapBusy, setRoadmapBusy] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamingId, setStreamingId] = useState<string | null>(null);
   const [quizBusy, setQuizBusy] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
@@ -51,6 +65,23 @@ export function TutorClient({
     return () => window.removeEventListener("scroll", close);
   }, [profileOpen]);
 
+  async function toggleRoadmap(item: TutorRoadmapItem) {
+    if (roadmapBusy) return;
+    const next = item.status === "done" ? "pending" : "done";
+    setRoadmapBusy(item.id);
+    setRoadmap(prev => prev.map(x => x.id === item.id ? { ...x, status: next } : x));
+    try {
+      const res = await fetch(`/api/tutor/roadmap/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      const data = await res.json();
+      if (res.ok && data.roadmap) setRoadmap(data.roadmap);
+    } catch { /* keep optimistic state */ }
+    finally { setRoadmapBusy(null); }
+  }
+
   async function refreshProfile() {
     try {
       const res = await fetch("/api/tutor/profile", { cache: "no-store" });
@@ -62,11 +93,80 @@ export function TutorClient({
     } catch { /* keep current profile */ }
   }
 
+  async function runTutorStream(body: Record<string, unknown>, opts: { removeIds?: string[]; restoreInput?: string } = {}) {
+    const tempId = `stream-${Date.now()}`;
+    const placeholder: TutorMessage = {
+      id: tempId,
+      role: "assistant",
+      content: "",
+      createdAt: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, placeholder]);
+    setStreamingId(tempId);
+    setLoading(true);
+    setError("");
+    let done = false;
+    try {
+      const res = await fetch("/api/tutor/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "老师暂时没回答上来");
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let acc = "";
+      while (true) {
+        const { done: ended, value } = await reader.read();
+        if (ended) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+        for (const part of parts) {
+          const line = part.split("\n").find(l => l.trim().startsWith("data:"));
+          if (!line) continue;
+          const payload = line.trim().slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+          let data: any;
+          try { data = JSON.parse(payload); } catch { continue; }
+          if (data.error) throw new Error(data.error);
+          if (data.delta) {
+            acc += data.delta;
+            const visible = visibleTutorText(acc);
+            setMessages(prev => prev.map(m => m.id === tempId ? { ...m, content: visible } : m));
+          }
+          if (data.done) {
+            done = true;
+            setMessages(prev => [
+              ...prev.filter(m => m.id !== tempId),
+              data.message,
+              ...(Array.isArray(data.extraMessages) ? data.extraMessages : []),
+            ]);
+            if (data.roadmap) setRoadmap(data.roadmap);
+          }
+        }
+      }
+      if (!done) throw new Error("连接中断了，老师的话没有传完");
+      refreshProfile();
+    } catch (err) {
+      const remove = new Set([tempId, ...(opts.removeIds || [])]);
+      setMessages(prev => prev.filter(m => !remove.has(m.id)));
+      if (opts.restoreInput) setInput(opts.restoreInput);
+      setError(err instanceof Error ? err.message : "老师暂时没回答上来");
+    } finally {
+      setStreamingId(null);
+      setLoading(false);
+    }
+  }
+
   async function send(text?: string) {
     const content = (text ?? input).trim();
     if (!content || loading) return;
     setInput("");
-    setError("");
     const optimistic: TutorMessage = {
       id: `local-${Date.now()}`,
       role: "user",
@@ -74,24 +174,7 @@ export function TutorClient({
       createdAt: new Date().toISOString(),
     };
     setMessages(prev => [...prev, optimistic]);
-    setLoading(true);
-    try {
-      const res = await fetch("/api/tutor/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "老师暂时没回答上来");
-      setMessages(prev => [...prev, data.message, ...(Array.isArray(data.extraMessages) ? data.extraMessages : [])]);
-      refreshProfile();
-    } catch (err) {
-      setMessages(prev => prev.filter(m => m.id !== optimistic.id));
-      setInput(content);
-      setError(err instanceof Error ? err.message : "老师暂时没回答上来");
-    } finally {
-      setLoading(false);
-    }
+    await runTutorStream({ message: content }, { removeIds: [optimistic.id], restoreInput: content });
   }
 
   async function makeQuiz() {
@@ -156,9 +239,21 @@ export function TutorClient({
     refreshProfile();
   }
 
+  function updateCheck(check: TutorCheckPublic) {
+    setMessages(prev => prev.map(m => m.check?.id === check.id ? { ...m, check } : m));
+  }
+
+  async function followUpOnCheck(check: TutorCheckPublic) {
+    await runTutorStream({ eventCheckId: check.id });
+  }
+
+  async function followUpOnQuiz(quiz: TutorQuizPublic) {
+    await runTutorStream({ eventQuizId: quiz.id });
+  }
+
   return (
-    <div className="mx-auto max-w-[1180px] px-4 py-5 lg:px-9 lg:py-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="mx-auto flex max-w-[1180px] flex-col px-4 py-5 lg:h-dvh lg:max-h-dvh lg:overflow-hidden lg:px-9 lg:py-6">
+      <div className="shrink-0 flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-muted">
             <GraduationCap className="h-3.5 w-3.5 text-brand" /> One-on-one tutor
@@ -194,8 +289,12 @@ export function TutorClient({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <section className="flex h-[calc(100dvh-340px)] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(31,29,25,0.04)] lg:h-[calc(100vh-190px)] lg:min-h-[560px]">
+      <div className="mt-4 shrink-0 lg:hidden">
+        <TutorRoadmap items={roadmap} busyId={roadmapBusy} onToggle={toggleRoadmap} />
+      </div>
+
+      <div className="mt-5 grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <section className="flex h-[calc(100dvh-340px)] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(31,29,25,0.04)] lg:h-full lg:min-h-0">
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
             {messages.length === 0 && !loading ? (
               <div className="mx-auto flex max-w-xl flex-col items-center justify-center py-10 text-center">
@@ -218,25 +317,46 @@ export function TutorClient({
               </div>
             ) : (
               <div className="mx-auto max-w-2xl space-y-4">
-                {messages.map(message => (
+                {messages.map(message => message.role === "system" ? (
+                  <div key={message.id} className="flex justify-center py-0.5">
+                    <span className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[9px]",
+                      /答错|与预期不同/.test(message.content) ? "border-accent/20 bg-accent-soft text-accent" : "border-line bg-surface-2 text-muted"
+                    )}>
+                      {/答错|与预期不同/.test(message.content)
+                        ? <AlertCircle className="h-3 w-3" />
+                        : <CheckCircle2 className="h-3 w-3 text-brand" />}
+                      {message.content}
+                    </span>
+                  </div>
+                ) : (
                   <div key={message.id} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
                     <div className={cn(
-                      "max-w-[92%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-6",
+                      "text-[13px] leading-6",
                       message.role === "user"
-                        ? "rounded-br-md bg-ink text-paper"
-                        : "rounded-bl-md border border-line bg-surface-2 text-ink"
+                        ? "max-w-[92%] rounded-2xl rounded-br-md bg-ink px-3.5 py-2.5 text-paper"
+                        : "w-full max-w-none py-1 text-ink"
                     )}>
                       {message.role === "assistant" ? (
                         <>
                           <div className="mb-1 flex items-center gap-1.5 text-[9px] uppercase tracking-[0.12em] text-muted">
                             <Sparkles className="h-3 w-3 text-brand" /> 老师
                           </div>
-                          <Markdown>{message.content}</Markdown>
+                          {message.content ? <Markdown>{message.content}</Markdown> : message.id === streamingId ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted"><Loader2 className="h-3 w-3 animate-spin" /> 老师正在组织语言…</span>
+                          ) : null}
                           {message.quiz && (
                             <TutorQuizCard
                               quiz={message.quiz}
                               onUpdated={updateQuiz}
-                              onAsk={send}
+                              onAnswered={(quiz, systemMessage) => { updateQuiz(quiz); if (systemMessage) setMessages(prev => [...prev, systemMessage]); followUpOnQuiz(quiz); }}
+                            />
+                          )}
+                          {message.check && (
+                            <TutorCheckCard
+                              check={message.check}
+                              onUpdated={updateCheck}
+                              onAnswered={(check, systemMessage) => { updateCheck(check); if (systemMessage) setMessages(prev => [...prev, systemMessage]); followUpOnCheck(check); }}
                             />
                           )}
                         </>
@@ -246,7 +366,7 @@ export function TutorClient({
                     </div>
                   </div>
                 ))}
-                {loading && (
+                {loading && !streamingId && (
                   <div className="flex justify-start">
                     <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-line bg-surface-2 px-3.5 py-3 text-[11px] text-muted">
                       <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" /> 老师正在想，先不急着一次讲完…
@@ -288,7 +408,8 @@ export function TutorClient({
           </div>
         </section>
 
-        <aside className={cn("space-y-3", !profileOpen && "hidden lg:block")}>
+        <aside className={cn("no-scrollbar min-h-0 space-y-3 lg:max-h-full lg:overflow-y-auto lg:overscroll-contain lg:pr-1", !profileOpen && "hidden lg:block")}>
+          <TutorRoadmap items={roadmap} busyId={roadmapBusy} onToggle={toggleRoadmap} />
           <ProfileCard profile={profile} goal={goal} setGoal={setGoal} saveGoal={saveGoal} savingGoal={savingGoal} />
         </aside>
       </div>

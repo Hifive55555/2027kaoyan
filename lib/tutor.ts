@@ -56,3 +56,77 @@ export function normalizeTutorQuiz(raw: TutorQuizDraft | null | undefined): Tuto
     explanation: text(raw.explanation, 600),
   };
 }
+
+export interface TutorCheckDraft {
+  kind: "yesno" | "fill";
+  prompt: string;
+  options?: string[];
+  answer?: string;
+  placeholder?: string;
+}
+
+export function normalizeTutorCheck(raw: TutorCheckDraft | null | undefined): TutorCheckDraft | null {
+  if (!raw || typeof raw !== "object") return null;
+  const kind = raw.kind === "fill" ? "fill" : "yesno";
+  const prompt = text(raw.prompt, 240);
+  if (prompt.length < 3) return null;
+  if (kind === "fill") {
+    return {
+      kind,
+      prompt,
+      placeholder: text(raw.placeholder, 60) || "填写你的答案",
+      answer: text(raw.answer, 120),
+    };
+  }
+  const options = (Array.isArray(raw.options) ? raw.options : [])
+    .map(o => text(o, 20))
+    .filter(Boolean)
+    .slice(0, 4);
+  return {
+    kind,
+    prompt,
+    options: options.length >= 2 ? options : ["会了", "还不会", "不确定"],
+  };
+}
+
+export function extractTutorCheck(text: string): { text: string; check: TutorCheckDraft | null } {
+  const match = text.match(/\[\[CHECK\]\]([\s\S]*?)\[\[\/CHECK\]\]/i);
+  if (!match) return { text, check: null };
+  let check: TutorCheckDraft | null = null;
+  try {
+    check = normalizeTutorCheck(JSON.parse(match[1].trim()));
+  } catch {
+    check = null;
+  }
+  return { text: text.replace(match[0], "").trim(), check };
+}
+
+export interface TutorRoadmapDraft {
+  add?: { title: string; parentId?: string | null }[];
+  update?: { id: string; status: "pending" | "in_progress" | "done" }[];
+}
+
+export function extractTutorRoadmap(text: string): { text: string; ops: TutorRoadmapDraft | null } {
+  const match = text.match(/\[\[ROADMAP\]\]([\s\S]*?)\[\[\/ROADMAP\]\]/i);
+  if (!match) return { text, ops: null };
+  let ops: TutorRoadmapDraft | null = null;
+  try {
+    const raw = JSON.parse(match[1].trim());
+    const add = Array.isArray(raw?.add)
+      ? raw.add.map((x: any) => ({ title: textOf(x?.title, 100), parentId: x?.parentId ? textOf(x.parentId, 40) : null })).filter((x: any) => x.title.length >= 2)
+      : [];
+    const update = Array.isArray(raw?.update)
+      ? raw.update
+          .map((x: any) => ({ id: textOf(x?.id, 40), status: x?.status }))
+          .filter((x: any) => x.id && ["pending", "in_progress", "done"].includes(x.status))
+      : [];
+    ops = { add, update } as TutorRoadmapDraft;
+  } catch {
+    ops = null;
+  }
+  return { text: text.replace(match[0], "").trim(), ops };
+}
+
+function textOf(value: unknown, max: number): string {
+  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+}

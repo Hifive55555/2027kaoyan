@@ -1,6 +1,7 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
+import remarkCjkFriendly from "remark-cjk-friendly";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -27,7 +28,7 @@ export function Markdown({ children, className }: { children: string; className?
   return (
     <div className={cn("md-body", className)}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={[remarkCjkFriendly, remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
           a: ({ href, children }) => (

@@ -1,0 +1,34 @@
+import { NextRequest } from "next/server";
+import { requireUserApi } from "@/lib/auth";
+import { getTutorCheck, getTutorCheckRaw, saveTutorCheckAttempt, saveTutorMessage } from "@/lib/queries";
+
+export const runtime = "nodejs";
+
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  try {
+    const auth = await requireUserApi();
+    if (!auth) return Response.json({ error: "请先登录" }, { status: 401 });
+    const { id } = await ctx.params;
+    const check = getTutorCheckRaw(id, auth.userId);
+    if (!check) return Response.json({ error: "检查不存在" }, { status: 404 });
+    if (check.attempt) return Response.json({ check, systemMessage: null });
+
+    const body = await req.json().catch(() => ({}));
+    const response = String(body.response || "").trim().slice(0, 300);
+    if (!response) return Response.json({ error: "请先作答" }, { status: 400 });
+    const expected = String(check.answer || "").trim();
+    const normalize = (s: string) => s.toLowerCase().replace(/\s/g, "").replace(/[。；;，,]$/g, "");
+    const correct = expected ? normalize(response) === normalize(expected) : null;
+    saveTutorCheckAttempt(auth.userId, id, response, correct);
+    const label = check.prompt.length > 48 ? `${check.prompt.slice(0, 48)}…` : check.prompt;
+    const outcome = correct === null ? "" : correct ? "（正确）" : "（与预期不同）";
+    const systemMessage = saveTutorMessage(
+      auth.userId,
+      "system",
+      `已完成快速检查「${label}」：回答 ${response}${outcome}。`
+    );
+    return Response.json({ check: getTutorCheck(id, auth.userId), systemMessage, correct });
+  } catch (err) {
+    return Response.json({ error: err instanceof Error ? err.message : "提交失败" }, { status: 500 });
+  }
+}

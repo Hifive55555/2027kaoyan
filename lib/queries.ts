@@ -8,8 +8,10 @@ import type {
   QuestionPublic,
   SectionPublic,
   SubjectId,
+  TutorCheckPublic,
   TutorMessage,
   TutorQuizPublic,
+  TutorRoadmapItem,
 } from "./types";
 
 type Row = Record<string, any>;
@@ -653,11 +655,11 @@ export function getTutorQuizRaw(id: string, userId: string): (TutorQuizPublic & 
   return { ...quiz, answer: parseJson(row.answer, ""), explanation: row.explanation || "" };
 }
 
-export function saveTutorMessage(userId: string, role: "user" | "assistant", content: string, quizId?: string): TutorMessage {
+export function saveTutorMessage(userId: string, role: "user" | "assistant" | "system", content: string, quizId?: string, checkId?: string): TutorMessage {
   const id = newId("tm");
   const createdAt = nowIso();
-  getDb().prepare(`INSERT INTO tutor_messages (id, user_id, role, content, quiz_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(id, userId, role, content, quizId || null, createdAt);
+  getDb().prepare(`INSERT INTO tutor_messages (id, user_id, role, content, quiz_id, check_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, userId, role, content, quizId || null, checkId || null, createdAt);
   return { id, role, content, createdAt };
 }
 
@@ -671,10 +673,11 @@ export function getTutorMessages(userId: string, limit = 80): TutorMessage[] {
   ).all(userId, limit) as Row[];
   return rows.reverse().map(row => ({
     id: row.id,
-    role: row.role === "assistant" ? "assistant" as const : "user" as const,
+    role: row.role === "assistant" ? "assistant" as const : row.role === "system" ? "system" as const : "user" as const,
     content: row.content,
     createdAt: row.created_at,
     quiz: row.quiz_id ? getTutorQuiz(row.quiz_id, userId) || undefined : undefined,
+    check: row.check_id ? getTutorCheck(row.check_id, userId) || undefined : undefined,
   }));
 }
 
@@ -724,4 +727,171 @@ export function saveRandomMessage(userId: string, questionId: string, role: "use
   getDb().prepare(
     `INSERT INTO random_messages (id, user_id, question_id, role, content, created_at) VALUES (?, ?, ?, ?, ?, ?)`
   ).run(newId("rm"), userId, questionId, role, content, nowIso());
+}
+
+
+export interface TutorCheckInput {
+  kind: "yesno" | "fill";
+  prompt: string;
+  options?: string[];
+  answer?: string;
+  placeholder?: string;
+}
+
+function tutorCheckPublic(row: Row, attempt?: Row): TutorCheckPublic {
+  const base: TutorCheckPublic = {
+    id: row.id,
+    kind: row.kind === "fill" ? "fill" : "yesno",
+    prompt: row.prompt,
+    options: parseJson(row.options, []),
+    placeholder: row.placeholder || "",
+  };
+  if (!attempt) return base;
+  return {
+    ...base,
+    attempt: {
+      response: attempt.response || "",
+      correct: attempt.correct === null || attempt.correct === undefined ? null : !!attempt.correct,
+      createdAt: attempt.created_at,
+    },
+  };
+}
+
+export function createTutorCheck(userId: string, input: TutorCheckInput): string {
+  const id = newId("tc");
+  const kind = input.kind === "fill" ? "fill" : "yesno";
+  const options = kind === "yesno"
+    ? (input.options?.length ? input.options.slice(0, 4) : ["会了", "还不会", "不确定"])
+    : [];
+  getDb().prepare(
+    `INSERT INTO tutor_checks (id, user_id, kind, prompt, options, answer, placeholder, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    id, userId, kind, input.prompt, JSON.stringify(options),
+    input.answer || "", input.placeholder || "", nowIso()
+  );
+  return id;
+}
+
+export function getTutorCheck(id: string, userId: string): TutorCheckPublic | null {
+  const db = getDb();
+  const row = db.prepare(`SELECT * FROM tutor_checks WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
+  if (!row) return null;
+  const attempt = db.prepare(`SELECT * FROM tutor_check_attempts WHERE check_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1`).get(id, userId) as Row | undefined;
+  return tutorCheckPublic(row, attempt);
+}
+
+export function getTutorCheckRaw(id: string, userId: string): (TutorCheckPublic & { answer: string; }) | null {
+  const check = getTutorCheck(id, userId);
+  if (!check) return null;
+  const row = getDb().prepare(`SELECT answer FROM tutor_checks WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
+  return { ...check, answer: row?.answer || "" };
+}
+
+export function saveTutorCheckAttempt(userId: string, checkId: string, response: string, correct: boolean | null) {
+  getDb().prepare(
+    `INSERT INTO tutor_check_attempts (id, user_id, check_id, response, correct, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(newId("tca"), userId, checkId, response, correct === null ? null : correct ? 1 : 0, nowIso());
+}
+
+
+const ROADMAP_STATUS = new Set(["pending", "in_progress", "done"]);
+
+function toRoadmapItem(row: Row): TutorRoadmapItem {
+  return {
+    id: row.id,
+    parentId: row.parent_id || null,
+    title: row.title,
+    status: ROADMAP_STATUS.has(row.status) ? row.status : "pending",
+    sort: Number(row.sort) || 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function getTutorRoadmap(userId: string): TutorRoadmapItem[] {
+  const rows = getDb().prepare(
+    `SELECT * FROM tutor_roadmap WHERE user_id = ? ORDER BY sort ASC, created_at ASC`
+  ).all(userId) as Row[];
+  return rows.map(toRoadmapItem);
+}
+
+function roadmapOrder(items: TutorRoadmapItem[]): TutorRoadmapItem[] {
+  const byParent = new Map<string, TutorRoadmapItem[]>();
+  const roots: TutorRoadmapItem[] = [];
+  for (const item of items) {
+    const key = item.parentId || "";
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key)!.push(item);
+    if (!item.parentId) roots.push(item);
+  }
+  const out: TutorRoadmapItem[] = [];
+  const walk = (parentId: string, depth: number) => {
+    for (const item of byParent.get(parentId) || []) {
+      out.push(item);
+      walk(item.id, depth + 1);
+    }
+  };
+  walk("", 0);
+  // Orphans / cycles: append so they are not silently lost.
+  for (const item of items) if (!out.some(x => x.id === item.id)) out.push(item);
+  return out;
+}
+
+export function getTutorRoadmapText(userId: string): string {
+  const items = getTutorRoadmap(userId);
+  if (!items.length) return "（暂无学习路线；当开始新主题时，先列出接下来 1–3 个可执行点。）";
+  const ordered = roadmapOrder(items);
+  const depth = new Map<string, number>();
+  for (const item of ordered) depth.set(item.id, item.parentId ? (depth.get(item.parentId) || 0) + 1 : 0);
+  const status = { pending: "待学", in_progress: "进行中", done: "已完成" };
+  return ordered.slice(0, 40).map(item => {
+    const pad = "  ".repeat(depth.get(item.id) || 0);
+    return `${pad}- [${status[item.status]}] ${item.title}  (id: ${item.id})`;
+  }).join("\n");
+}
+
+export interface TutorRoadmapOps {
+  add?: { title: string; parentId?: string | null }[];
+  update?: { id: string; status: "pending" | "in_progress" | "done" }[];
+}
+
+export function applyTutorRoadmapOps(userId: string, ops: TutorRoadmapOps): TutorRoadmapItem[] {
+  const db = getDb();
+  const existing = new Map(getTutorRoadmap(userId).map(i => [i.id, i]));
+  const maxSortRow = db.prepare(`SELECT COALESCE(MAX(sort), -1) AS n FROM tutor_roadmap WHERE user_id = ?`).get(userId) as Row;
+  let nextSort = Number(maxSortRow.n) + 1;
+  const now = nowIso();
+  const existingTitles = new Set([...existing.values()].map(i => `${i.parentId || ""}|${i.title.toLowerCase()}`));
+  for (const add of (ops.add || []).slice(0, 10)) {
+    if (existing.size >= 60) break;
+    const title = String(add.title || "").replace(/\s+/g, " ").trim().slice(0, 100);
+    if (title.length < 2) continue;
+    const parentId = add.parentId && existing.has(add.parentId) ? add.parentId : null;
+    const key = `${parentId || ""}|${title.toLowerCase()}`;
+    if (existingTitles.has(key)) continue;
+    existingTitles.add(key);
+    const id = newId("tr");
+    db.prepare(
+      `INSERT INTO tutor_roadmap (id, user_id, parent_id, title, status, sort, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`
+    ).run(id, userId, parentId, title, nextSort++, now, now);
+    existing.set(id, { id, parentId, title, status: "pending", sort: nextSort - 1, createdAt: now, updatedAt: now });
+  }
+  for (const update of (ops.update || []).slice(0, 12)) {
+    if (!existing.has(update.id) || !ROADMAP_STATUS.has(update.status)) continue;
+    db.prepare(`UPDATE tutor_roadmap SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
+      .run(update.status, now, update.id, userId);
+  }
+  return getTutorRoadmap(userId);
+}
+
+export function setTutorRoadmapStatus(userId: string, id: string, status: "pending" | "in_progress" | "done"): TutorRoadmapItem[] | null {
+  if (!ROADMAP_STATUS.has(status)) return null;
+  const row = getDb().prepare(`SELECT id FROM tutor_roadmap WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
+  if (!row) return null;
+  getDb().prepare(`UPDATE tutor_roadmap SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
+    .run(status, nowIso(), id, userId);
+  return getTutorRoadmap(userId);
 }

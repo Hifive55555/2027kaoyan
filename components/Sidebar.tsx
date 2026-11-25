@@ -33,7 +33,7 @@ export function Sidebar({ streak, todayCount, accuracy, displayName }: { streak:
   }
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-paper-2 px-4 py-5 lg:flex">
+    <aside className="no-scrollbar sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-line bg-paper-2 px-4 py-5 lg:flex">
       <Link href="/" className="flex items-center gap-3 px-2">
         <div className="grid h-10 w-10 place-items-center rounded-xl border border-line-strong bg-surface-2 font-serif text-lg text-ink shadow-sm">
           备

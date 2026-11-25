@@ -210,10 +210,34 @@ export interface TutorQuizPublic {
   };
 }
 
+export interface TutorCheckPublic {
+  id: string;
+  kind: "yesno" | "fill";
+  prompt: string;
+  options: string[];
+  placeholder: string;
+  attempt?: {
+    response: string;
+    correct?: boolean | null;
+    createdAt: string;
+  };
+}
+
 export interface TutorMessage {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   createdAt: string;
   quiz?: TutorQuizPublic;
+  check?: TutorCheckPublic;
+}
+
+export interface TutorRoadmapItem {
+  id: string;
+  parentId: string | null;
+  title: string;
+  status: "pending" | "in_progress" | "done";
+  sort: number;
+  createdAt: string;
+  updatedAt: string;
 }

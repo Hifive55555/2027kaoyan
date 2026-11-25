@@ -1,6 +1,7 @@
 const BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
 const MODEL = process.env.DEEPSEEK_MODEL || "deepseek-flash";
 const EFFORT = process.env.DEEPSEEK_EFFORT || "low";
+export type ReasoningEffort = "low" | "medium" | "high" | "max";
 
 export interface ChatMessageInput {
   role: "system" | "user" | "assistant";
@@ -24,7 +25,7 @@ function apiKey(): string {
 
 export async function chatJson<T>(
   messages: ChatMessageInput[],
-  opts: { maxTokens?: number; temperature?: number; timeoutMs?: number } = {}
+  opts: { maxTokens?: number; temperature?: number; timeoutMs?: number; effort?: ReasoningEffort } = {}
 ): Promise<T> {
   const maxTokens = opts.maxTokens ?? 12000;
   const temperature = opts.temperature ?? 0.7;
@@ -46,7 +47,7 @@ export async function chatJson<T>(
           messages,
           temperature,
           max_tokens: maxTokens,
-          reasoning_effort: EFFORT,
+          reasoning_effort: opts.effort ?? EFFORT,
           response_format: { type: "json_object" },
         }),
       });
@@ -96,7 +97,7 @@ export function parseJsonLoose<T>(text: string): T {
 export async function streamChat(
   messages: ChatMessageInput[],
   onDelta: (delta: string) => void,
-  opts: { maxTokens?: number; temperature?: number; signal?: AbortSignal } = {}
+  opts: { maxTokens?: number; temperature?: number; signal?: AbortSignal; effort?: ReasoningEffort } = {}
 ): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.maxTokens && opts.maxTokens > 8000 ? 240000 : 120000);
@@ -116,7 +117,7 @@ export async function streamChat(
         messages,
         temperature: opts.temperature ?? 0.6,
         max_tokens: opts.maxTokens ?? 4000,
-        reasoning_effort: EFFORT,
+        reasoning_effort: opts.effort ?? EFFORT,
         stream: true,
       }),
     });

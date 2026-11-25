@@ -1,17 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Check, CheckCircle2, Loader2, MessageCircle, X } from "lucide-react";
-import type { TutorQuizPublic } from "@/lib/types";
+import { Check, CheckCircle2, Loader2, X } from "lucide-react";
+import type { TutorMessage, TutorQuizPublic } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Markdown } from "./Markdown";
 
 export function TutorQuizCard({
-  quiz, onUpdated, onAsk,
+  quiz, onUpdated, onAnswered,
 }: {
   quiz: TutorQuizPublic;
   onUpdated: (quiz: TutorQuizPublic) => void;
-  onAsk: (text: string) => void;
+  onAnswered?: (quiz: TutorQuizPublic, systemMessage?: TutorMessage) => void;
 }) {
   const [local, setLocal] = useState(quiz);
   const [selected, setSelected] = useState(quiz.attempt?.answer || "");
@@ -33,21 +33,12 @@ export function TutorQuizCard({
       if (!res.ok) throw new Error(data.error || "提交失败");
       setLocal(data.quiz);
       onUpdated(data.quiz);
-      if (data.quiz?.attempt) {
-        const result = data.quiz.attempt.correct ? "答对了" : "答错了";
-        const topic = data.quiz.topic || data.quiz.chapter || "这道题";
-        onAsk(`我刚做了这道「${topic}」，选了 ${data.quiz.attempt.answer}，${result}。请结合这道题继续引导我，不要直接跳到下一题。`);
-      }
+      if (data.quiz?.attempt) onAnswered?.(data.quiz, data.systemMessage);
     } catch (err) {
       setError(err instanceof Error ? err.message : "提交失败");
     } finally {
       setBusy(false);
     }
-  }
-
-  function ask() {
-    if (!local.attempt) return;
-    onAsk(`我刚做了这道「${local.topic || local.chapter || "巩固题"}」，选了 ${local.attempt.answer}，${local.attempt.correct ? "答对了" : "答错了"}。请结合这道题继续引导我，不要直接跳到下一题。`);
   }
 
   return (
@@ -110,9 +101,6 @@ export function TutorQuizCard({
               {local.attempt?.correct ? "答对了" : `答错了，正确答案 ${local.answer}`}
             </div>
             {local.explanation && <Markdown className="mt-1.5 text-[11px] leading-5 text-muted">{local.explanation}</Markdown>}
-            <button onClick={ask} className="mt-2 inline-flex items-center gap-1 text-[10px] text-muted hover:text-ink">
-              <MessageCircle className="h-3 w-3" /> 让老师就这题继续讲
-            </button>
           </div>
         )}
         {error && <p className="mt-2 text-[10px] text-accent">{error}</p>}

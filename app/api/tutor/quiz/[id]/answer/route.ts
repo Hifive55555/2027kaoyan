@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireUserApi } from "@/lib/auth";
-import { getTutorQuizRaw, saveTutorQuizAttempt, getTutorQuiz } from "@/lib/queries";
+import { getTutorQuizRaw, saveTutorQuizAttempt, getTutorQuiz, saveTutorMessage } from "@/lib/queries";
 
 export const runtime = "nodejs";
 
@@ -19,7 +19,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     if (!answer) return Response.json({ error: "请选择一个答案" }, { status: 400 });
     const correct = answer === String(quiz.answer).trim().toUpperCase();
     saveTutorQuizAttempt(auth.userId, id, answer, correct);
-    return Response.json({ correct, quiz: getTutorQuiz(id, auth.userId) });
+    const label = quiz.topic || quiz.chapter || "巩固题";
+    const systemMessage = saveTutorMessage(
+      auth.userId,
+      "system",
+      `已完成巩固题「${label}」：选择 ${answer}，${correct ? "答对" : "答错"}。`
+    );
+    return Response.json({ correct, quiz: getTutorQuiz(id, auth.userId), systemMessage });
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : "提交失败" }, { status: 500 });
   }
