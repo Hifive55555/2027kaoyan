@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
 import { requireUserApi } from "@/lib/auth";
 import { getTutorCheck, getTutorCheckRaw, saveTutorCheckAttempt, saveTutorMessage, getTutorConversation, getTutorConversationForCheck, getOrCreateActiveTutorConversation } from "@/lib/queries";
+import { judgeTutorCheckAnswer } from "@/lib/tutor-judge";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -17,8 +19,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const response = String(body.response || "").trim().slice(0, 300);
     if (!response) return Response.json({ error: "请先作答" }, { status: 400 });
     const expected = String(check.answer || "").trim();
-    const normalize = (s: string) => s.toLowerCase().replace(/\s/g, "").replace(/[。；;，,]$/g, "");
-    const correct = expected ? normalize(response) === normalize(expected) : null;
+    const correct = check.kind === "yesno"
+      ? (expected ? response.toLowerCase().trim() === expected.toLowerCase().trim() : null)
+      : await judgeTutorCheckAnswer({ prompt: check.prompt, expected, response });
     saveTutorCheckAttempt(auth.userId, id, response, correct);
     const label = check.prompt.length > 48 ? `${check.prompt.slice(0, 48)}…` : check.prompt;
     const outcome = correct === null ? "" : correct ? "（正确）" : "（与预期不同）";
