@@ -10,7 +10,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   const session = await requireUserPage();
   const stats = getStats(session.userId!);
   return (
-    <div className="mx-auto flex min-h-screen max-w-[1500px]">
+    <div className="flex min-h-screen w-full">
       <Sidebar streak={stats.streak} todayCount={stats.todayCount} accuracy={stats.accuracy} displayName={session.displayName} />
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-line bg-paper/90 px-4 backdrop-blur sm:px-5 lg:hidden">
