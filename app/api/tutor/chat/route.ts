@@ -89,6 +89,7 @@ function streamTutorReply(input: {
             tool_calls: round.toolCalls,
           });
 
+          let terminal = false;
           for (const call of round.toolCalls) {
             const name = call.function?.name || "";
             const args = parseArgs(call.function?.arguments || "{}");
@@ -102,8 +103,14 @@ function streamTutorReply(input: {
             } catch (err) {
               toolResult = { result: { error: err instanceof Error ? err.message : "工具执行失败" } };
             }
-            if (toolResult.quizId) quizId = toolResult.quizId;
-            if (toolResult.checkId) checkId = toolResult.checkId;
+            if (toolResult.quizId) {
+              quizId = toolResult.quizId;
+              terminal = true;
+            }
+            if (toolResult.checkId) {
+              checkId = toolResult.checkId;
+              terminal = true;
+            }
             const content = JSON.stringify(toolResult.result);
             saveTutorMessage(
               input.userId,
@@ -122,9 +129,14 @@ function streamTutorReply(input: {
             });
             send({ tool: { phase: "done", name } });
           }
+
+          // A generated card is a turn-ending action: the student must answer
+          // before the teacher continues. Without this boundary the model
+          // writes post-tool commentary that renders above the card.
+          if (terminal) break;
         }
 
-        const reply = limitTutorReply(full.trim()) || input.fallback;
+        const reply = limitTutorReply(full.trim()) || (!quizId && !checkId ? input.fallback : "");
         const assistant = saveTutorMessage(
           input.userId,
           input.conversationId,

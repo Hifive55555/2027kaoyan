@@ -682,22 +682,7 @@ export function saveTutorMessage(
   };
 }
 
-export function attachTutorQuiz(userId: string, conversationId: string, messageId: string, quizId: string): TutorMessage | null {
-  const db = getDb();
-  const row = db.prepare(
-    `SELECT id, role, content, created_at FROM tutor_messages
-     WHERE id = ? AND user_id = ? AND conversation_id = ? AND role = 'assistant'`
-  ).get(messageId, userId, conversationId) as Row | undefined;
-  if (!row) return null;
-  db.prepare(`UPDATE tutor_messages SET quiz_id = ? WHERE id = ? AND user_id = ?`).run(quizId, messageId, userId);
-  return {
-    id: row.id,
-    role: "assistant",
-    content: row.content,
-    createdAt: row.created_at,
-    quiz: getTutorQuiz(quizId, userId) || undefined,
-  };
-}
+
 
 export function deleteTutorMessage(userId: string, id: string) {
   getDb().prepare(`DELETE FROM tutor_messages WHERE id = ? AND user_id = ?`).run(id, userId);

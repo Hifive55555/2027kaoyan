@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  AlertCircle, BookOpen, CheckCircle2, ChevronDown, GraduationCap, Lightbulb, Loader2, MessageCircle,
+  AlertCircle, BookOpen, CheckCircle2, ChevronDown, GraduationCap, Loader2, MessageCircle,
   Plus, Route, Send, Sparkles, Target, X,
 } from "lucide-react";
 import type { LearnerProfile, TutorCheckPublic, TutorConversationPublic, TutorMessage, TutorQuizPublic, TutorRoadmapItem } from "@/lib/types";
@@ -49,7 +49,6 @@ export function TutorClient({
   const [loading, setLoading] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [toolStatus, setToolStatus] = useState<string>("");
-  const [quizBusy, setQuizBusy] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
   const [error, setError] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
@@ -213,27 +212,6 @@ export function TutorClient({
     window.location.href = `/tutor?c=${data.conversation.id}`;
   }
 
-  async function makeQuiz() {
-    if (quizBusy || loading) return;
-    setQuizBusy(true);
-    setError("");
-    try {
-      const res = await fetch("/api/tutor/quiz", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: conversation.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "出题失败");
-      setMessages(prev => [...prev, data.message]);
-      refreshProfile();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "出题失败");
-    } finally {
-      setQuizBusy(false);
-    }
-  }
-
   async function saveGoal() {
     if (savingGoal) return;
     setSavingGoal(true);
@@ -284,14 +262,6 @@ export function TutorClient({
           <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0" />
         </button>
         <button
-          onClick={makeQuiz}
-          disabled={quizBusy || loading || !!conversation.archivedAt}
-          aria-label="出题巩固"
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-brand/30 bg-brand-soft text-brand disabled:opacity-40"
-        >
-          {quizBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lightbulb className="h-4 w-4" />}
-        </button>
-        <button
           onClick={() => { newConversation().catch(err => setError(err instanceof Error ? err.message : "创建对话失败")); }}
           disabled={loading}
           aria-label="新对话"
@@ -313,9 +283,9 @@ export function TutorClient({
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-muted">
             <GraduationCap className="h-3.5 w-3.5 text-brand" /> One-on-one tutor
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <h1 className="font-serif text-[28px] leading-tight sm:text-[34px]">答疑</h1>
-            <button onClick={() => setConversationOpen(true)} className="inline-flex max-w-[300px] items-center gap-1 rounded-lg border border-line bg-surface px-2.5 py-1 text-[10px] text-muted hover:border-line-strong hover:text-ink">
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <h1 className="font-serif text-[28px] leading-none sm:text-[34px]">答疑</h1>
+            <button onClick={() => setConversationOpen(true)} className="inline-flex max-w-[300px] items-center gap-1 rounded-lg border border-line bg-surface px-2.5 py-1 text-[10px] leading-none text-muted hover:border-line-strong hover:text-ink">
               <MessageCircle className="h-3 w-3 shrink-0" /> <span className="truncate">{conversation.title}</span> <ChevronDown className="h-3 w-3 shrink-0" />
             </button>
           </div>
@@ -324,14 +294,6 @@ export function TutorClient({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={makeQuiz}
-            disabled={quizBusy || loading || !!conversation.archivedAt}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-brand/30 bg-brand-soft px-2.5 text-[10px] text-brand hover:border-brand/60 disabled:opacity-40"
-          >
-            {quizBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Lightbulb className="h-3 w-3" />}
-            {quizBusy ? "出题中…" : "出题巩固"}
-          </button>
           <button
             onClick={() => { newConversation().catch(err => setError(err instanceof Error ? err.message : "创建对话失败")); }}
             disabled={loading}

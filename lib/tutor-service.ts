@@ -2,15 +2,7 @@ import { chatJson } from "./deepseek";
 import { buildLearnerProfile, toLearnerPrompt } from "./learner";
 import { buildTutorQuizMessages, type TutorQuizDraft } from "./prompts";
 import { normalizeTutorQuiz } from "./tutor";
-import {
-  attachTutorQuiz,
-  createTutorQuiz,
-  getTutorMessages,
-  getTutorQuiz,
-  getTutorQuizRaw,
-  saveTutorMessage,
-} from "./queries";
-import type { TutorMessage } from "./types";
+import { createTutorQuiz, getTutorMessages, getTutorQuizRaw } from "./queries";
 
 export async function generateTutorQuizDraft(
   userId: string,
@@ -34,19 +26,3 @@ export async function generateTutorQuizDraft(
   return { quizId, quiz: full };
 }
 
-export async function generateTutorQuizMessage(
-  userId: string,
-  conversationId: string,
-  topic?: string,
-  attachToMessageId?: string,
-): Promise<TutorMessage> {
-  const { quizId, quiz } = await generateTutorQuizDraft(userId, conversationId, topic);
-
-  if (attachToMessageId) {
-    const attached = attachTutorQuiz(userId, conversationId, attachToMessageId, quizId);
-    if (attached) return attached;
-  }
-
-  const assistant = saveTutorMessage(userId, conversationId, "assistant", "", quizId);
-  return { ...assistant, quiz: getTutorQuiz(quizId, userId) || undefined };
-}
