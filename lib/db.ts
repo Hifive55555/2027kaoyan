@@ -71,6 +71,25 @@ function migrateTutorConversations(db: DatabaseSync) {
   }
 }
 
+function backfillTutorConversationTitles(db: DatabaseSync) {
+  const rows = db.prepare(
+    `SELECT id FROM tutor_conversations WHERE title = '新的对话'`
+  ).all() as { id: string }[];
+  for (const { id } of rows) {
+    const first = db.prepare(
+      `SELECT content FROM tutor_messages WHERE conversation_id = ? AND role = 'user' AND content NOT LIKE '【系统事件】%' ORDER BY created_at LIMIT 1`
+    ).get(id) as { content: string } | undefined;
+    const title = String(first?.content || "")
+      .replace(/\s+/g, " ")
+      .replace(/[。！？!?]+$/g, "")
+      .trim()
+      .slice(0, 24);
+    if (!title) continue;
+    db.prepare(`UPDATE tutor_conversations SET title = ?, updated_at = ? WHERE id = ?`)
+      .run(title, new Date().toISOString(), id);
+  }
+}
+
 function migrateTutorRoadmapConversations(db: DatabaseSync) {
   const users = db.prepare(
     `SELECT DISTINCT user_id FROM tutor_roadmap WHERE conversation_id IS NULL AND user_id IS NOT NULL`
@@ -401,6 +420,7 @@ function migrate(db: DatabaseSync) {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_tutor_messages_conversation ON tutor_messages(conversation_id, created_at);`);
   migrateTutorConversations(db);
   migrateTutorRoadmapConversations(db);
+  backfillTutorConversationTitles(db);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_tutor_roadmap_conversation ON tutor_roadmap(conversation_id, user_id, parent_id, sort);`);
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_papers_user ON papers(user_id, created_at);
