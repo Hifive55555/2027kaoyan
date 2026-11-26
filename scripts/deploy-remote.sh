@@ -16,6 +16,7 @@ NEXT_TELEMETRY_DISABLED=1 npm run build
 echo "→ package source + .next"
 tar \
   --exclude=node_modules \
+  --exclude=.git \
   --exclude=.next/cache \
   --exclude=.next/dev \
   --exclude=data/raw \
