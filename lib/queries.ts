@@ -656,14 +656,30 @@ export function getTutorQuizRaw(id: string, userId: string): (TutorQuizPublic & 
   return { ...quiz, answer: parseJson(row.answer, ""), explanation: row.explanation || "" };
 }
 
-export function saveTutorMessage(userId: string, conversationId: string, role: "user" | "assistant" | "system", content: string, quizId?: string, checkId?: string): TutorMessage {
+export function saveTutorMessage(
+  userId: string,
+  conversationId: string,
+  role: "user" | "assistant" | "system" | "tool",
+  content: string,
+  quizId?: string,
+  checkId?: string,
+  extras: { toolCalls?: unknown; toolCallId?: string; toolName?: string } = {},
+): TutorMessage {
   const id = newId("tm");
   const createdAt = nowIso();
-  getDb().prepare(`INSERT INTO tutor_messages (id, user_id, conversation_id, role, content, quiz_id, check_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, userId, conversationId, role, content, quizId || null, checkId || null, createdAt);
+  const toolCalls = extras.toolCalls ? JSON.stringify(extras.toolCalls) : null;
+  getDb().prepare(
+    `INSERT INTO tutor_messages (id, user_id, conversation_id, role, content, quiz_id, check_id, tool_calls, tool_call_id, tool_name, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, userId, conversationId, role, content, quizId || null, checkId || null, toolCalls, extras.toolCallId || null, extras.toolName || null, createdAt);
   getDb().prepare(`UPDATE tutor_conversations SET updated_at = ? WHERE id = ? AND user_id = ?`)
     .run(createdAt, conversationId, userId);
-  return { id, role, content, createdAt };
+  return {
+    id, role, content, createdAt,
+    toolCalls: extras.toolCalls as TutorMessage["toolCalls"],
+    toolCallId: extras.toolCallId,
+    toolName: extras.toolName,
+  };
 }
 
 export function attachTutorQuiz(userId: string, conversationId: string, messageId: string, quizId: string): TutorMessage | null {
@@ -690,15 +706,32 @@ export function deleteTutorMessage(userId: string, id: string) {
 export function getTutorMessages(userId: string, conversationId: string, limit?: number): TutorMessage[] {
   const db = getDb();
   const rows = (limit
-    ? db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? ORDER BY created_at DESC LIMIT ?`).all(userId, conversationId, limit)
-    : db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? ORDER BY created_at DESC`).all(userId, conversationId)) as Row[];
-  return rows.reverse().map(row => ({
+    ? db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? AND role != 'tool' ORDER BY created_at DESC LIMIT ?`).all(userId, conversationId, limit)
+    : db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? AND role != 'tool' ORDER BY created_at DESC`).all(userId, conversationId)) as Row[];
+  return rows.reverse().filter(row => !(row.role === "assistant" && row.tool_calls && !row.content)).map(row => ({
     id: row.id,
     role: row.role === "assistant" ? "assistant" as const : row.role === "system" ? "system" as const : "user" as const,
     content: row.content,
     createdAt: row.created_at,
     quiz: row.quiz_id ? getTutorQuiz(row.quiz_id, userId) || undefined : undefined,
     check: row.check_id ? getTutorCheck(row.check_id, userId) || undefined : undefined,
+  }));
+}
+
+export function getTutorHistory(userId: string, conversationId: string, excludeId?: string): TutorMessage[] {
+  const rows = getDb().prepare(
+    `SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? ${excludeId ? "AND id != ?" : ""} ORDER BY created_at ASC`
+  ).all(...(excludeId ? [userId, conversationId, excludeId] : [userId, conversationId])) as Row[];
+  return rows.filter(row => row.role !== "system").map(row => ({
+    id: row.id,
+    role: row.role === "assistant" ? "assistant" as const : row.role === "tool" ? "tool" as const : "user" as const,
+    content: row.content,
+    createdAt: row.created_at,
+    quiz: row.quiz_id ? getTutorQuiz(row.quiz_id, userId) || undefined : undefined,
+    check: row.check_id ? getTutorCheck(row.check_id, userId) || undefined : undefined,
+    toolCalls: row.tool_calls ? parseJson(row.tool_calls, undefined) : undefined,
+    toolCallId: row.tool_call_id || undefined,
+    toolName: row.tool_name || undefined,
   }));
 }
 
@@ -1059,8 +1092,9 @@ export function getTutorConversation(userId: string, id: string): TutorConversat
   const db = getDb();
   const row = db.prepare(`SELECT * FROM tutor_conversations WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
   if (!row) return null;
-  const stat = db.prepare(`SELECT COUNT(*) AS n, MAX(created_at) AS last_at FROM tutor_messages WHERE conversation_id = ? AND user_id = ?`).get(id, userId) as Row;
-  const last = db.prepare(`SELECT content FROM tutor_messages WHERE conversation_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1`).get(id, userId) as Row | undefined;
+  const visible = `role != 'tool' AND NOT (role = 'assistant' AND tool_calls IS NOT NULL AND content = '')`;
+  const stat = db.prepare(`SELECT COUNT(*) AS n, MAX(created_at) AS last_at FROM tutor_messages WHERE conversation_id = ? AND user_id = ? AND ${visible}`).get(id, userId) as Row;
+  const last = db.prepare(`SELECT content FROM tutor_messages WHERE conversation_id = ? AND user_id = ? AND ${visible} ORDER BY created_at DESC LIMIT 1`).get(id, userId) as Row | undefined;
   return {
     id: row.id,
     title: row.title || "新的对话",
@@ -1114,9 +1148,9 @@ export function listTutorConversations(userId: string, archived: boolean, query 
   const like = `%${q}%`;
   const rows = db.prepare(
     `SELECT c.*,
-       (SELECT COUNT(*) FROM tutor_messages m WHERE m.conversation_id = c.id) AS message_count,
-       (SELECT content FROM tutor_messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
-       (SELECT MAX(created_at) FROM tutor_messages m WHERE m.conversation_id = c.id) AS last_message_at
+       (SELECT COUNT(*) FROM tutor_messages m WHERE m.conversation_id = c.id AND m.role != 'tool' AND NOT (m.role = 'assistant' AND m.tool_calls IS NOT NULL AND m.content = '')) AS message_count,
+       (SELECT content FROM tutor_messages m WHERE m.conversation_id = c.id AND m.role != 'tool' AND NOT (m.role = 'assistant' AND m.tool_calls IS NOT NULL AND m.content = '') ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+       (SELECT MAX(created_at) FROM tutor_messages m WHERE m.conversation_id = c.id AND m.role != 'tool' AND NOT (m.role = 'assistant' AND m.tool_calls IS NOT NULL AND m.content = '')) AS last_message_at
      FROM tutor_conversations c
      WHERE c.user_id = ?
        AND ${archived ? "c.archived_at IS NOT NULL" : "c.archived_at IS NULL"}

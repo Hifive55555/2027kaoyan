@@ -1,10 +1,8 @@
 import { NextRequest } from "next/server";
 import { requireUserApi } from "@/lib/auth";
-import { getTutorCheck, getTutorCheckRaw, saveTutorCheckAttempt, saveTutorMessage, getTutorConversation, getTutorConversationForCheck, getOrCreateActiveTutorConversation, getTutorMessages } from "@/lib/queries";
-import { judgeTutorCheckAnswer } from "@/lib/tutor-judge";
+import { getTutorCheck, getTutorCheckRaw, saveTutorCheckAttempt, saveTutorMessage, getTutorConversation, getTutorConversationForCheck, getOrCreateActiveTutorConversation } from "@/lib/queries";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -21,31 +19,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const conversationId = getTutorConversationForCheck(auth.userId, id) || getOrCreateActiveTutorConversation(auth.userId).id;
     const conversation = getTutorConversation(auth.userId, conversationId);
     if (!conversation || conversation.archivedAt) return Response.json({ error: "对话不存在或已归档" }, { status: 409 });
-    const expected = String(check.answer || "").trim();
-    const recent = getTutorMessages(auth.userId, conversationId).filter(m => m.role !== "system" && m.content.trim()).slice(-8);
-    const context = recent.map(m => `${m.role === "user" ? "学生" : "老师"}：${m.content.replace(/\s+/g, " ").slice(0, 500)}`).join("\n");
-    let correct: boolean | null = null;
-    if (check.kind === "yesno") {
-      correct = expected ? response.toLowerCase().trim() === expected.toLowerCase().trim() : null;
-    } else {
-      try {
-        correct = await judgeTutorCheckAnswer({ prompt: check.prompt, expected, response, context });
-      } catch (err) {
-        // Do not turn a judging-model failure into a wrong answer. Keep the
-        // attempt unjudged and let the teacher interpret it.
-        console.error("[tutor] fill check judge failed:", err);
-      }
-    }
-    saveTutorCheckAttempt(auth.userId, id, response, correct);
-    const label = check.prompt.length > 48 ? `${check.prompt.slice(0, 48)}…` : check.prompt;
-    const outcome = correct === null ? "（未判定）" : correct ? "（正确）" : "（与预期不同）";
+
+    // Record the raw answer only. The teacher already has the generated
+    // question and expected answer in its tool-call history.
+    saveTutorCheckAttempt(auth.userId, id, response, null);
     const systemMessage = saveTutorMessage(
       auth.userId,
       conversationId,
       "system",
-      `已完成快速检查「${label}」：回答 ${response}${outcome}。`
+      `【系统事件】学生提交了答案：${response}`
     );
-    return Response.json({ check: getTutorCheck(id, auth.userId), systemMessage, correct });
+    return Response.json({ check: getTutorCheck(id, auth.userId), systemMessage, correct: null });
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : "提交失败" }, { status: 500 });
   }

@@ -48,6 +48,7 @@ export function TutorClient({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  const [toolStatus, setToolStatus] = useState<string>("");
   const [quizBusy, setQuizBusy] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
   const [error, setError] = useState("");
@@ -137,6 +138,15 @@ export function TutorClient({
           let data: any;
           try { data = JSON.parse(payload); } catch { continue; }
           if (data.error) throw new Error(data.error);
+          if (data.tool) {
+            const names: Record<string, string> = {
+              search_question_bank: "检索题库", search_knowledge: "查知识点", get_learner_profile: "查学习档案",
+              get_learning_roadmap: "查学习路线", update_learning_roadmap: "更新学习路线",
+              generate_quiz: "出题", generate_check: "生成检查题", get_syllabus: "查大纲",
+            };
+            if (data.tool.phase === "calling") setToolStatus(names[data.tool.name] || "调用工具");
+            else setToolStatus("");
+          }
           if (data.delta) {
             acc += data.delta;
             const visible = visibleTutorText(acc);
@@ -144,6 +154,7 @@ export function TutorClient({
           }
           if (data.done) {
             done = true;
+            setToolStatus("");
             setMessages(prev => [
               ...prev.filter(m => m.id !== tempId),
               data.message,
@@ -164,6 +175,7 @@ export function TutorClient({
     } finally {
       setStreamingId(null);
       setLoading(false);
+      setToolStatus("");
     }
   }
 
@@ -377,6 +389,13 @@ export function TutorClient({
                     </div>
                   </div>
                 ))}
+                {toolStatus && (
+                  <div className="flex justify-start">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand-soft/40 px-3 py-1.5 text-[10px] text-brand">
+                      <Loader2 className="h-3 w-3 animate-spin" /> 老师正在{toolStatus}…
+                    </div>
+                  </div>
+                )}
                 {loading && !streamingId && (
                   <div className="flex justify-start">
                     <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-line bg-surface-2 px-3.5 py-3 text-[11px] text-muted">

@@ -19,14 +19,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     if (!answer) return Response.json({ error: "请选择一个答案" }, { status: 400 });
     const correct = answer === String(quiz.answer).trim().toUpperCase();
     saveTutorQuizAttempt(auth.userId, id, answer, correct);
-    const label = quiz.topic || quiz.chapter || "巩固题";
     const conversationId = getTutorConversationForQuiz(auth.userId, id) || getOrCreateActiveTutorConversation(auth.userId).id;
     if (getTutorConversation(auth.userId, conversationId)?.archivedAt) return Response.json({ error: "对话已归档，请先取消归档" }, { status: 409 });
     const systemMessage = saveTutorMessage(
       auth.userId,
       conversationId,
       "system",
-      `已完成巩固题「${label}」：选择 ${answer}，${correct ? "答对" : "答错"}。`
+      `【系统事件】学生提交了答案：${answer}`
     );
     return Response.json({ correct, quiz: getTutorQuiz(id, auth.userId), systemMessage });
   } catch (err) {

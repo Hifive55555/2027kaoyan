@@ -225,11 +225,14 @@ export interface TutorCheckPublic {
 
 export interface TutorMessage {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   content: string;
   createdAt: string;
   quiz?: TutorQuizPublic;
   check?: TutorCheckPublic;
+  toolCalls?: { id: string; type?: string; function: { name: string; arguments: string } }[];
+  toolCallId?: string;
+  toolName?: string;
 }
 
 export interface TutorRoadmapItem {

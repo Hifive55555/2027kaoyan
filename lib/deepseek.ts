@@ -6,9 +6,27 @@ export interface StreamMeta {
   annotations: any[];
 }
 
+export interface ToolCall {
+  id: string;
+  type?: "function";
+  function: { name: string; arguments: string };
+}
+
+export interface ToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
 export interface ChatMessageInput {
-  role: "system" | "user" | "assistant";
-  content: string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }> | null;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+  name?: string;
 }
 
 export class DeepSeekError extends Error {
@@ -155,6 +173,103 @@ export async function streamChat(
     }
     opts.onMeta?.({ annotations });
     return full;
+  } finally {
+    clearTimeout(timer);
+    opts.signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+export interface ToolStreamResult {
+  text: string;
+  toolCalls: ToolCall[];
+  annotations: any[];
+}
+
+/**
+ * OpenAI-compatible tool-calling stream. Unlike streamChat, tool-call deltas
+ * are accumulated by index and never forwarded to the UI as text.
+ */
+export async function streamChatWithTools(
+  messages: ChatMessageInput[],
+  tools: ToolDefinition[],
+  onDelta: (delta: string) => void,
+  opts: {
+    maxTokens?: number;
+    temperature?: number;
+    signal?: AbortSignal;
+    effort?: ReasoningEffort;
+    onToolStatus?: (status: { phase: "calling" | "done"; name?: string }) => void;
+  } = {},
+): Promise<ToolStreamResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 180000);
+  const onAbort = () => controller.abort();
+  opts.signal?.addEventListener("abort", onAbort);
+  let text = "";
+  const annotations: any[] = [];
+  const calls = new Map<number, { id: string; name: string; arguments: string }>();
+  try {
+    const res = await fetch(`${BASE_URL}/chat/completions`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey()}` },
+      body: JSON.stringify({
+        model: MODEL,
+        messages,
+        temperature: opts.temperature ?? 0.55,
+        max_tokens: opts.maxTokens ?? 3000,
+        reasoning_effort: opts.effort ?? "high",
+        stream: true,
+        tools,
+        tool_choice: "auto",
+      }),
+    });
+    if (!res.ok || !res.body) {
+      const body = await res.text().catch(() => "");
+      throw new DeepSeekError(`DeepSeek ${res.status}: ${body.slice(0, 500)}`, res.status);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payload = trimmed.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const json = JSON.parse(payload);
+          const delta = json.choices?.[0]?.delta;
+          if (Array.isArray(delta?.annotations)) annotations.push(...delta.annotations);
+          if (typeof delta?.content === "string" && delta.content) {
+            text += delta.content;
+            onDelta(delta.content);
+          }
+          for (const tc of delta?.tool_calls || []) {
+            const index = Number(tc.index ?? 0);
+            const current = calls.get(index) || { id: "", name: "", arguments: "" };
+            if (tc.id) current.id = String(tc.id);
+            if (tc.function?.name) current.name += String(tc.function.name);
+            if (tc.function?.arguments) current.arguments += String(tc.function.arguments);
+            calls.set(index, current);
+          }
+        } catch { /* keepalive */ }
+      }
+    }
+    const toolCalls: ToolCall[] = [...calls.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([, value]) => ({
+        id: value.id || `call_${Math.random().toString(36).slice(2)}`,
+        type: "function" as const,
+        function: { name: value.name, arguments: value.arguments || "{}" },
+      }));
+    if (toolCalls.length) opts.onToolStatus?.({ phase: "calling", name: toolCalls[0].function.name });
+    return { text, toolCalls, annotations };
   } finally {
     clearTimeout(timer);
     opts.signal?.removeEventListener("abort", onAbort);

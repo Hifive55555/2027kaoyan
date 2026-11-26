@@ -1,121 +1,155 @@
 import { NextRequest } from "next/server";
 import { requireUserApi } from "@/lib/auth";
-import { streamChat, type ChatMessageInput } from "@/lib/deepseek";
+import { streamChatWithTools, type ChatMessageInput } from "@/lib/deepseek";
 import { buildTutorMessages } from "@/lib/prompts";
-import { buildLearnerProfile, toLearnerPrompt } from "@/lib/learner";
-import { getTutorRetrievalContext } from "@/lib/tutor-retrieval";
-import { extractTutorCheck, extractTutorRoadmap, limitTutorReply } from "@/lib/tutor";
-import { generateTutorQuizMessage } from "@/lib/tutor-service";
+import { TUTOR_TOOLS, executeTutorTool } from "@/lib/tutor-tools";
+import { limitTutorReply } from "@/lib/tutor";
 import {
-  applyTutorRoadmapOps,
-  createTutorCheck,
-  deleteTutorMessage,
   getTutorCheck,
   getTutorCheckRaw,
-  getTutorMessages,
-  getTutorQuizRaw,
-  getTutorRoadmap,
-  getTutorRoadmapText,
   getTutorConversation,
   getTutorConversationForCheck,
   getTutorConversationForQuiz,
   getOrCreateActiveTutorConversation,
+  getTutorHistory,
+  getTutorQuiz,
+  getTutorQuizRaw,
+  getTutorRoadmap,
   saveTutorMessage,
-  titleTutorConversation,
 } from "@/lib/queries";
 
 export const runtime = "nodejs";
-export const maxDuration = 180;
+export const maxDuration = 300;
 
-function finalizeTutorReply(userId: string, conversationId: string, full: string, fallback: string) {
-  const markerQuiz = /\[\[QUIZ\]\]/i.test(full);
-  const implicitQuiz = /(?:给你|我们|要不|我).{0,12}(?:出|做|练).{0,8}(?:一道|一题)|巩固一下|试一道/.test(full);
-  const noQuiz = full.replace(/\[\[QUIZ\]\]/gi, "").trim();
-  const roadmapParsed = extractTutorRoadmap(noQuiz);
-  const checkParsed = extractTutorCheck(roadmapParsed.text);
-  const reply = limitTutorReply(checkParsed.text) || fallback;
-  const checkId = checkParsed.check ? createTutorCheck(userId, checkParsed.check) : undefined;
-  const roadmap = roadmapParsed.ops ? applyTutorRoadmapOps(userId, conversationId, roadmapParsed.ops) : getTutorRoadmap(userId, conversationId);
-  return { reply, checkId, roadmap, markerQuiz, implicitQuiz };
-}
-
-function formatSources(annotations: any[]): string {
-  const seen = new Set<string>();
-  const rows: string[] = [];
-  for (const item of annotations) {
-    const c = item?.url_citation || item;
-    const url = String(c?.url || "");
-    const title = String(c?.title || url).replace(/[\[\]]/g, "").slice(0, 100);
-    if (!/^https?:\/\//.test(url) || seen.has(url)) continue;
-    seen.add(url);
-    rows.push(`- [${title}](${url})`);
-    if (rows.length >= 4) break;
+function parseArgs(raw: string): Record<string, unknown> {
+  try {
+    const value = JSON.parse(raw || "{}");
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
   }
-  return rows.length ? `\n\n参考来源：\n${rows.join("\n")}` : "";
 }
 
 function streamTutorReply(input: {
   userId: string;
   conversationId: string;
-  messages: ChatMessageInput[];
+  history: ReturnType<typeof getTutorHistory>;
+  currentUser: string;
   fallback: string;
   userMessageId?: string;
-  explicitQuiz?: boolean;
 }) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      let full = "";
       const send = (obj: unknown) => {
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
         } catch { /* client disconnected */ }
       };
-      let sources: any[] = [];
+      let full = "";
+      let quizId: string | undefined;
+      let checkId: string | undefined;
+      let messages: ChatMessageInput[] = buildTutorMessages({
+        history: input.history.filter(m => m.role !== "system").map(m => ({
+          role: m.role === "tool" ? "tool" : m.role === "assistant" ? "assistant" : "user",
+          content: m.content,
+          toolCalls: m.toolCalls,
+          toolCallId: m.toolCallId,
+          name: m.toolName,
+        })),
+        currentUser: input.currentUser,
+      });
+
       try {
-        await streamChat(input.messages, delta => {
-          full += delta;
-          // Deliberately send raw deltas. The browser hides [[CHECK]] /
-          // [[QUIZ]] / [[ROADMAP]] blocks while they are being generated;
-          // the final `done` event replaces the temporary message with the
-          // cleaned, persisted message.
-          send({ delta });
-        }, { maxTokens: 3000, temperature: 0.55, effort: "high", webSearch: true, onMeta: meta => { sources = meta.annotations; } });
+        while (true) {
+          const round = await streamChatWithTools(messages, TUTOR_TOOLS, delta => {
+            full += delta;
+            send({ delta });
+          }, {
+            maxTokens: 4000,
+            temperature: 0.55,
+            effort: "high",
+          });
 
-        const finalized = finalizeTutorReply(input.userId, input.conversationId, full, input.fallback);
-        const replyWithSources = finalized.reply + formatSources(sources);
-        let assistant = saveTutorMessage(input.userId, input.conversationId, "assistant", replyWithSources, undefined, finalized.checkId);
-        let quizMessage = null;
+          if (!round.toolCalls.length) break;
 
-        const wantsQuiz = !finalized.checkId && (finalized.markerQuiz || input.explicitQuiz || finalized.implicitQuiz);
-        if (wantsQuiz) {
-          const recent = getTutorMessages(input.userId, input.conversationId, 12);
-          const lastQuiz = [...recent].reverse().find(m => m.quiz);
-          const hasPendingQuiz = !!lastQuiz?.quiz && !lastQuiz.quiz.attempt;
-          if (!hasPendingQuiz) {
+          // Persist the assistant tool-call turn and feed the tool results back.
+          saveTutorMessage(
+            input.userId,
+            input.conversationId,
+            "assistant",
+            "",
+            undefined,
+            undefined,
+            { toolCalls: round.toolCalls },
+          );
+          messages.push({
+            role: "assistant",
+            content: round.text || null,
+            tool_calls: round.toolCalls,
+          });
+
+          for (const call of round.toolCalls) {
+            const name = call.function?.name || "";
+            const args = parseArgs(call.function?.arguments || "{}");
+            send({ tool: { phase: "calling", name } });
+            let toolResult: Awaited<ReturnType<typeof executeTutorTool>>;
             try {
-              quizMessage = await generateTutorQuizMessage(input.userId, input.conversationId, undefined, assistant.id);
-              if (quizMessage) assistant = quizMessage;
+              toolResult = await executeTutorTool(name, args, {
+                userId: input.userId,
+                conversationId: input.conversationId,
+              });
             } catch (err) {
-              console.error("[tutor] auto quiz failed:", err);
+              toolResult = { result: { error: err instanceof Error ? err.message : "工具执行失败" } };
             }
+            if (toolResult.quizId) quizId = toolResult.quizId;
+            if (toolResult.checkId) checkId = toolResult.checkId;
+            const content = JSON.stringify(toolResult.result);
+            saveTutorMessage(
+              input.userId,
+              input.conversationId,
+              "tool",
+              content,
+              undefined,
+              undefined,
+              { toolCallId: call.id, toolName: name },
+            );
+            messages.push({
+              role: "tool",
+              tool_call_id: call.id,
+              name,
+              content,
+            });
+            send({ tool: { phase: "done", name } });
           }
         }
 
-        const conversation = getTutorConversation(input.userId, input.conversationId);
+        const reply = limitTutorReply(full.trim()) || input.fallback;
+        const assistant = saveTutorMessage(
+          input.userId,
+          input.conversationId,
+          "assistant",
+          reply,
+          quizId,
+          checkId,
+        );
         send({
           done: true,
           message: {
             ...assistant,
-            check: finalized.checkId ? getTutorCheck(finalized.checkId, input.userId) : undefined,
+            quiz: quizId ? getTutorQuiz(quizId, input.userId) || undefined : undefined,
+            check: checkId ? getTutorCheck(checkId, input.userId) || undefined : undefined,
           },
-          roadmap: finalized.roadmap,
+          roadmap: getTutorRoadmap(input.userId, input.conversationId),
           conversationId: input.conversationId,
-          conversationTitle: conversation?.title,
+          conversationTitle: getTutorConversation(input.userId, input.conversationId)?.title,
           extraMessages: [],
         });
       } catch (err) {
-        if (input.userMessageId) deleteTutorMessage(input.userId, input.userMessageId);
+        if (input.userMessageId) {
+          // Keep the user message on tool errors so they can retry; only the
+          // failed assistant turn is absent.
+        }
         send({ error: err instanceof Error ? err.message : "老师暂时没回答上来" });
       } finally {
         try { controller.close(); } catch { /* closed */ }
@@ -145,28 +179,12 @@ export async function POST(req: NextRequest) {
       const conversationId = String(body.conversationId || "") || getTutorConversationForQuiz(auth.userId, eventQuizId);
       const conversation = conversationId ? getTutorConversation(auth.userId, conversationId) : null;
       if (!conversation || conversation.archivedAt) return Response.json({ error: "对话不存在或已归档" }, { status: 409 });
-      const history = getTutorMessages(auth.userId, conversation.id).map(m => ({ role: m.role, content: m.content }));
-      const profile = buildLearnerProfile(auth.userId);
-      const messages = buildTutorMessages({
-        profileText: toLearnerPrompt(profile),
-        roadmapText: getTutorRoadmapText(auth.userId, conversation.id),
-        retrievalText: getTutorRetrievalContext(auth.userId, conversation.id, `${quiz.stem} ${quiz.topic} ${quiz.chapter}`),
-        history,
-      });
-      messages.push({
-        role: "user",
-        content: `【系统事件】学生完成了巩固题。
-题目：${quiz.stem}
-选择：${quiz.attempt.answer}
-正确答案：${quiz.answer}
-结果：${quiz.attempt.correct ? "答对" : "答错"}
-请根据这个结果继续教学。`,
-      });
       return streamTutorReply({
         userId: auth.userId,
         conversationId: conversation.id,
-        messages,
-        fallback: "我们先停一下。你觉得自己刚才那一步的关键是什么？",
+        history: getTutorHistory(auth.userId, conversation.id),
+        currentUser: `【系统事件】学生提交了答案：${quiz.attempt.answer}`,
+        fallback: "我们先停一下。你觉得刚才那一步的关键是什么？",
       });
     }
 
@@ -177,26 +195,11 @@ export async function POST(req: NextRequest) {
       const conversationId = String(body.conversationId || "") || getTutorConversationForCheck(auth.userId, eventCheckId);
       const conversation = conversationId ? getTutorConversation(auth.userId, conversationId) : null;
       if (!conversation || conversation.archivedAt) return Response.json({ error: "对话不存在或已归档" }, { status: 409 });
-      const history = getTutorMessages(auth.userId, conversation.id).map(m => ({ role: m.role, content: m.content }));
-      const profile = buildLearnerProfile(auth.userId);
-      const messages = buildTutorMessages({
-        profileText: toLearnerPrompt(profile),
-        roadmapText: getTutorRoadmapText(auth.userId, conversation.id),
-        retrievalText: getTutorRetrievalContext(auth.userId, conversation.id, `${check.prompt} ${check.answer}`),
-        history,
-      });
-      messages.push({
-        role: "user",
-        content: `【系统事件】学生完成了快速检查。
-检查：${check.prompt}
-回答：${check.attempt.response}
-${check.answer ? `预期答案：${check.answer}\n` : ""}结果：${check.attempt.correct === null ? "未判定" : check.attempt.correct ? "答对" : "答错"}
-请根据这个结果继续教学。`,
-      });
       return streamTutorReply({
         userId: auth.userId,
         conversationId: conversation.id,
-        messages,
+        history: getTutorHistory(auth.userId, conversation.id),
+        currentUser: `【系统事件】学生提交了答案：${check.attempt.response}`,
         fallback: "我们先停一下。你觉得自己刚才那一步的关键是什么？",
       });
     }
@@ -211,24 +214,13 @@ ${check.answer ? `预期答案：${check.answer}\n` : ""}结果：${check.attemp
     if (conversation.archivedAt) return Response.json({ error: "对话已归档，请先取消归档" }, { status: 409 });
 
     const userMessage = saveTutorMessage(auth.userId, conversation.id, "user", message);
-    titleTutorConversation(auth.userId, conversation.id, message);
-    const history = getTutorMessages(auth.userId, conversation.id).map(m => ({ role: m.role, content: m.content }));
-    const profile = buildLearnerProfile(auth.userId);
-    const messages = buildTutorMessages({
-      profileText: toLearnerPrompt(profile),
-      roadmapText: getTutorRoadmapText(auth.userId, conversation.id),
-      retrievalText: getTutorRetrievalContext(auth.userId, conversation.id, message),
-      history,
-    });
-    const explicitQuiz = /出题|来一道|练一题|做一道题/.test(message)
-      && !/(?:别|不要|不用|先不|不想).{0,6}出题/.test(message);
     return streamTutorReply({
       userId: auth.userId,
       conversationId: conversation.id,
-      messages,
+      history: getTutorHistory(auth.userId, conversation.id, userMessage.id),
+      currentUser: message,
       fallback: "我先不急着讲完整。你能说说自己目前卡在哪一步吗？",
       userMessageId: userMessage.id,
-      explicitQuiz,
     });
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : "老师暂时没回答上来" }, { status: 502 });

@@ -219,6 +219,9 @@ function migrate(db: DatabaseSync) {
       role TEXT NOT NULL,
       content TEXT NOT NULL,
       quiz_id TEXT,
+      tool_calls TEXT,
+      tool_call_id TEXT,
+      tool_name TEXT,
       created_at TEXT NOT NULL
     );
 
@@ -391,6 +394,9 @@ function migrate(db: DatabaseSync) {
   addColumn(db, "messages", "user_id", "TEXT");
   addColumn(db, "tutor_messages", "check_id", "TEXT");
   addColumn(db, "tutor_messages", "conversation_id", "TEXT");
+  addColumn(db, "tutor_messages", "tool_calls", "TEXT");
+  addColumn(db, "tutor_messages", "tool_call_id", "TEXT");
+  addColumn(db, "tutor_messages", "tool_name", "TEXT");
   addColumn(db, "tutor_roadmap", "conversation_id", "TEXT");
   db.exec(`CREATE INDEX IF NOT EXISTS idx_tutor_messages_conversation ON tutor_messages(conversation_id, created_at);`);
   migrateTutorConversations(db);

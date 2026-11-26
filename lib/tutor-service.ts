@@ -7,16 +7,16 @@ import {
   createTutorQuiz,
   getTutorMessages,
   getTutorQuiz,
+  getTutorQuizRaw,
   saveTutorMessage,
 } from "./queries";
 import type { TutorMessage } from "./types";
 
-export async function generateTutorQuizMessage(
+export async function generateTutorQuizDraft(
   userId: string,
   conversationId: string,
   topic?: string,
-  attachToMessageId?: string,
-): Promise<TutorMessage> {
+): Promise<{ quizId: string; quiz: NonNullable<ReturnType<typeof getTutorQuizRaw>> }> {
   const history = getTutorMessages(userId, conversationId, 20)
     .filter(m => m.role !== "system" && m.content.trim())
     .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
@@ -29,6 +29,18 @@ export async function generateTutorQuizMessage(
   const quiz = normalizeTutorQuiz(raw);
   if (!quiz) throw new Error("这次题目没有生成成功，再试一次");
   const quizId = createTutorQuiz(userId, quiz);
+  const full = getTutorQuizRaw(quizId, userId);
+  if (!full) throw new Error("题目保存失败");
+  return { quizId, quiz: full };
+}
+
+export async function generateTutorQuizMessage(
+  userId: string,
+  conversationId: string,
+  topic?: string,
+  attachToMessageId?: string,
+): Promise<TutorMessage> {
+  const { quizId, quiz } = await generateTutorQuizDraft(userId, conversationId, topic);
 
   if (attachToMessageId) {
     const attached = attachTutorQuiz(userId, conversationId, attachToMessageId, quizId);
