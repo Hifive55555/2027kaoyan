@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle, BookOpen, CheckCircle2, ChevronDown, GraduationCap, Lightbulb, Loader2, MessageCircle,
-  RotateCcw, Route, Send, Sparkles, Target, X,
+  Plus, Route, Send, Sparkles, Target, X,
 } from "lucide-react";
 import type { LearnerProfile, TutorCheckPublic, TutorConversationPublic, TutorMessage, TutorQuizPublic, TutorRoadmapItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -297,7 +297,7 @@ export function TutorClient({
           aria-label="新对话"
           className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line bg-surface text-muted disabled:opacity-40"
         >
-          <RotateCcw className="h-4 w-4" />
+          <Plus className="h-4 w-4" />
         </button>
         <button
           onClick={() => setProfileOpen(true)}
@@ -337,7 +337,7 @@ export function TutorClient({
             disabled={loading}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[10px] text-muted hover:border-line-strong hover:text-ink disabled:opacity-40"
           >
-            <RotateCcw className="h-3 w-3" /> 新对话
+            <Plus className="h-3 w-3" /> 新对话
           </button>
         </div>
       </div>
