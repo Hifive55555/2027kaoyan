@@ -225,7 +225,7 @@ export function PracticeSetup({ subjects, initialSubject, initialChapter }: {
         </div>
 
         <div className="space-y-4">
-          <Card className="sticky top-6 p-5 sm:p-6">
+          <Card className="p-5 sm:p-6 lg:sticky lg:top-6">
             <div className="text-[10px] uppercase tracking-[0.16em] text-muted">本次练习</div>
             <h3 className="mt-2 font-serif text-xl leading-snug">{subject.short} · {selectedNames[0] || "综合"}</h3>
             <p className="mt-1 text-[11px] leading-5 text-muted">{selectedNames.join("、") || "请选择章节"}</p>

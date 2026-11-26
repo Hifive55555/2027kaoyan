@@ -61,7 +61,7 @@ export default async function HomePage() {
                   <div className="mt-1.5 truncate font-serif text-[17px] text-ink">{latest.title}</div>
                   <div className="mt-1 text-xs text-muted">
                     已作答 {latest.answered} / {latest.total} 题
-                    {latest.answered > 0 && <> · 得分 {latest.score} / {latest.paperScore}</>}
+                    {latest.answered > 0 && <> · 得分 <span className="whitespace-nowrap">{latest.score} / {latest.paperScore}</span></>}
                   </div>
                 </div>
                 <div className="flex items-center gap-4">

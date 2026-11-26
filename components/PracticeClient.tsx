@@ -277,22 +277,22 @@ export function PracticeClient({ initialPaper, initialQuestionId }: { initialPap
   }
 
   return (
-    <div ref={topRef} className="mx-auto max-w-[1240px] px-4 py-5 lg:px-10 lg:py-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
+    <div ref={topRef} className="mx-auto max-w-[1240px] scroll-mt-14 px-4 py-5 lg:scroll-mt-0 lg:px-10 lg:py-8">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           <Link href={`/practice?subject=${paper.subject}`} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line bg-surface text-muted hover:text-ink">
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="min-w-0">
-            <div className="truncate font-serif text-[16px] text-ink">{paper.title}</div>
+            <div className="truncate font-serif text-[14px] text-ink sm:text-[16px]">{paper.title}</div>
             <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted">
-              <span>{paper.chapter}</span>
-              <span>·</span>
-              <span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" /> <SessionTimer /></span>
+              <span className="truncate">{paper.chapter}</span>
+              <span className="shrink-0">·</span>
+              <span className="inline-flex shrink-0 items-center gap-1"><Clock3 className="h-3 w-3" /> <SessionTimer /></span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <div className="hidden items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] text-muted sm:flex">
             <span>已作答 {answered.length}/{paper.questions.length}</span>
             {maxScore > 0 && <span className="text-ink">· {score}/{maxScore} 分</span>}

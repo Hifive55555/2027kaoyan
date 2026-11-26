@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle, BookOpen, CheckCircle2, ChevronDown, GraduationCap, Lightbulb, Loader2, MessageCircle,
-  RotateCcw, Send, Sparkles, Target, TrendingUp,
+  RotateCcw, Route, Send, Sparkles, Target, X,
 } from "lucide-react";
 import type { LearnerProfile, TutorCheckPublic, TutorConversationPublic, TutorMessage, TutorQuizPublic, TutorRoadmapItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -59,14 +59,27 @@ export function TutorClient({
 
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    if (messages.length === 0) {
+      el.scrollTop = 0;
+      return;
+    }
+    el.scrollTop = el.scrollHeight;
   }, [messages, loading]);
 
   useEffect(() => {
     if (!profileOpen) return;
     const close = () => setProfileOpen(false);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     window.addEventListener("scroll", close, { once: true });
-    return () => window.removeEventListener("scroll", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("scroll", close);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [profileOpen]);
 
   async function toggleRoadmap(item: TutorRoadmapItem) {
@@ -258,8 +271,44 @@ export function TutorClient({
   }
 
   return (
-    <div className="mx-auto flex max-w-[1180px] flex-col px-4 py-5 lg:h-dvh lg:max-h-dvh lg:overflow-hidden lg:px-9 lg:py-6">
-      <div className="shrink-0 flex flex-wrap items-end justify-between gap-3">
+    <div className="-mb-24 flex h-[calc(100dvh-3.5rem)] flex-col px-3 pb-[calc(3.75rem+env(safe-area-inset-bottom))] pt-2 lg:mx-auto lg:mb-0 lg:h-dvh lg:max-h-dvh lg:max-w-[1180px] lg:overflow-hidden lg:px-9 lg:py-6">
+      {/* 手机端紧凑栏：只留对话切换与关键操作，把空间让给聊天区 */}
+      <div className="flex shrink-0 items-center gap-1.5 pb-1 lg:hidden">
+        <button
+          onClick={() => setConversationOpen(true)}
+          aria-label="切换对话"
+          className="flex h-10 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[11px] text-muted"
+        >
+          <MessageCircle className="h-3.5 w-3.5 shrink-0 text-brand" />
+          <span className="truncate font-medium text-ink">{conversation.title}</span>
+          <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0" />
+        </button>
+        <button
+          onClick={makeQuiz}
+          disabled={quizBusy || loading || !!conversation.archivedAt}
+          aria-label="出题巩固"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-brand/30 bg-brand-soft text-brand disabled:opacity-40"
+        >
+          {quizBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lightbulb className="h-4 w-4" />}
+        </button>
+        <button
+          onClick={() => { newConversation().catch(err => setError(err instanceof Error ? err.message : "创建对话失败")); }}
+          disabled={loading}
+          aria-label="新对话"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line bg-surface text-muted disabled:opacity-40"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setProfileOpen(true)}
+          aria-label="学习档案与路线"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line bg-surface text-muted"
+        >
+          <Route className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="hidden shrink-0 flex-wrap items-end justify-between gap-3 lg:flex">
         <div>
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-muted">
             <GraduationCap className="h-3.5 w-3.5 text-brand" /> One-on-one tutor
@@ -275,12 +324,6 @@ export function TutorClient({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setProfileOpen(v => !v)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[10px] text-muted hover:border-line-strong hover:text-ink lg:hidden"
-          >
-            <TrendingUp className="h-3 w-3" /> 学习档案 <ChevronDown className={cn("h-3 w-3 transition-transform", profileOpen && "rotate-180")} />
-          </button>
           <button
             onClick={makeQuiz}
             disabled={quizBusy || loading || !!conversation.archivedAt}
@@ -299,10 +342,6 @@ export function TutorClient({
         </div>
       </div>
 
-      <div className="mt-4 shrink-0 lg:hidden">
-        <TutorRoadmap items={roadmap} busyId={roadmapBusy} onToggle={toggleRoadmap} />
-      </div>
-
       <TutorConversationModal
         open={conversationOpen}
         activeId={conversation.id}
@@ -312,22 +351,41 @@ export function TutorClient({
         onArchived={id => { if (id === conversation.id) window.location.href = "/tutor"; }}
       />
 
-      <div className="mt-5 grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <section className="flex h-[calc(100dvh-340px)] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(31,29,25,0.04)] lg:h-full lg:min-h-0">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+      {/* 手机端：学习档案与路线放进底部抽屉，不再占用聊天高度 */}
+      {profileOpen && (
+        <div className="fixed inset-0 z-[60] flex items-end bg-[#1f1d19]/40 p-3 backdrop-blur-[2px] lg:hidden" onClick={() => setProfileOpen(false)}>
+          <div className="max-h-[78vh] w-full space-y-3 overflow-y-auto overscroll-contain rounded-2xl border border-line bg-paper-2 p-3 shadow-2xl sm:mx-auto sm:max-w-[680px]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-muted">Learning profile</div>
+                <h2 className="mt-0.5 font-serif text-[18px] leading-tight">学习档案与路线</h2>
+              </div>
+              <button onClick={() => setProfileOpen(false)} aria-label="关闭" className="rounded-full p-1.5 text-muted hover:bg-hover hover:text-ink">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <TutorRoadmap items={roadmap} busyId={roadmapBusy} onToggle={toggleRoadmap} />
+            <ProfileCard profile={profile} goal={goal} setGoal={setGoal} saveGoal={saveGoal} savingGoal={savingGoal} />
+          </div>
+        </div>
+      )}
+
+      <div className="mt-2 grid min-h-0 flex-1 gap-5 lg:mt-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <section className="-mx-3 flex h-full min-h-0 flex-col overflow-hidden border-0 bg-surface lg:mx-0 lg:rounded-2xl lg:border lg:border-line lg:shadow-[0_1px_2px_rgba(31,29,25,0.04)]">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3.5 py-3.5 sm:px-6 sm:py-5">
             {messages.length === 0 && !loading ? (
-              <div className="mx-auto flex max-w-xl flex-col items-center justify-center py-10 text-center">
-                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand"><Sparkles className="h-5 w-5" /></span>
-                <h2 className="mt-4 font-serif text-[22px] text-ink">先说说你卡在哪</h2>
-                <p className="mt-2 max-w-md text-[12px] leading-6 text-muted">
+              <div className="mx-auto flex min-h-full max-w-xl flex-col items-center justify-center py-5 text-center sm:py-10">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand sm:h-12 sm:w-12 sm:rounded-2xl"><Sparkles className="h-5 w-5" /></span>
+                <h2 className="mt-3 font-serif text-[20px] text-ink sm:mt-4 sm:text-[22px]">先说说你卡在哪</h2>
+                <p className="mt-1.5 max-w-md text-[11.5px] leading-5 text-muted sm:mt-2 sm:text-[12px] sm:leading-6">
                   不用把问题问得很完整。告诉我你在看哪一章、哪一步觉得别扭，我会先用一个问题确认你的理解，再往下走。
                 </p>
-                <div className="mt-5 grid w-full gap-2 sm:grid-cols-2">
+                <div className="mt-4 grid w-full gap-1.5 sm:mt-5 sm:grid-cols-2 sm:gap-2">
                   {suggestions.map(s => (
                     <button
                       key={s}
                       onClick={() => send(s)}
-                      className="rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-left text-[11px] leading-5 text-muted transition-colors hover:border-brand/40 hover:text-ink"
+                      className="rounded-xl border border-line bg-surface-2 px-3 py-2 text-left text-[10.5px] leading-5 text-muted transition-colors hover:border-brand/40 hover:text-ink sm:py-2.5 sm:text-[11px]"
                     >
                       {s}
                     </button>
@@ -353,7 +411,7 @@ export function TutorClient({
                     <div className={cn(
                       "text-[13px] leading-6",
                       message.role === "user"
-                        ? "max-w-[92%] rounded-2xl rounded-br-md bg-ink px-3.5 py-2.5 text-paper"
+                        ? "max-w-[92%] break-words rounded-2xl rounded-br-md bg-ink px-3.5 py-2.5 text-paper"
                         : "w-full max-w-none py-1 text-ink"
                     )}>
                       {message.role === "assistant" ? (
@@ -418,7 +476,7 @@ export function TutorClient({
               <button onClick={() => setConversationOpen(true)} className="rounded-full border border-amber/30 px-2 py-0.5 hover:border-amber/60">管理对话</button>
             </div>
           )}
-          <div className="border-t border-line bg-sand px-3 py-3 sm:px-4">
+          <div className="border-t border-line bg-sand px-2.5 py-2.5 sm:px-4 sm:py-3">
             <div className="flex items-end gap-2 rounded-xl border border-line bg-surface p-2">
               <textarea
                 ref={inputRef}
@@ -429,7 +487,7 @@ export function TutorClient({
                 }}
                 rows={2}
                 disabled={!!conversation.archivedAt}
-                placeholder={conversation.archivedAt ? "对话已归档，请先取消归档" : "写出你的疑问，越具体越好… Enter 发送，Shift+Enter 换行"}
+                placeholder={conversation.archivedAt ? "对话已归档，请先取消归档" : "写出你的疑问，越具体越好…"}
                 className="max-h-32 min-h-[42px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[12px] leading-5 outline-none placeholder:text-faint"
               />
               <button
@@ -441,11 +499,11 @@ export function TutorClient({
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               </button>
             </div>
-            <div className="mt-1.5 text-center text-[9px] text-faint">老师会参考你的做题档案；关键结论仍请以教材和真题解析为准</div>
+            <div className="mt-1.5 hidden text-center text-[9px] text-faint sm:block">老师会参考你的做题档案；关键结论仍请以教材和真题解析为准</div>
           </div>
         </section>
 
-        <aside className={cn("no-scrollbar min-h-0 space-y-3 lg:max-h-full lg:overflow-y-auto lg:overscroll-contain lg:pr-1", !profileOpen && "hidden lg:block")}>
+        <aside className="no-scrollbar hidden min-h-0 space-y-3 lg:block lg:max-h-full lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
           <TutorRoadmap items={roadmap} busyId={roadmapBusy} onToggle={toggleRoadmap} />
           <ProfileCard profile={profile} goal={goal} setGoal={setGoal} saveGoal={saveGoal} savingGoal={savingGoal} />
         </aside>

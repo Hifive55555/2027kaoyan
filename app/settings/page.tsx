@@ -33,10 +33,10 @@ export default async function SettingsPage() {
           <Card className="p-5">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted"><Server className="h-4 w-4 text-brand" /> 模型</div>
             <div className="mt-3 space-y-2 text-[12px]">
-              <div className="flex justify-between"><span className="text-muted">服务</span><span>DeepSeek</span></div>
-              <div className="flex justify-between"><span className="text-muted">模型</span><span className="font-mono text-[11px]">{process.env.DEEPSEEK_MODEL || "deepseek-flash"}</span></div>
-              <div className="flex justify-between"><span className="text-muted">Base URL</span><span className="font-mono text-[10px] text-muted">{process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com"}</span></div>
-              <div className="flex justify-between"><span className="text-muted">密钥</span><span className="inline-flex items-center gap-1 font-mono text-[10px]"><KeyRound className="h-3 w-3" /> {masked}</span></div>
+              <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-muted">服务</span><span className="min-w-0 text-right">DeepSeek</span></div>
+              <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-muted">模型</span><span className="min-w-0 break-all text-right font-mono text-[11px]">{process.env.DEEPSEEK_MODEL || "deepseek-flash"}</span></div>
+              <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-muted">Base URL</span><span className="min-w-0 break-all text-right font-mono text-[10px] text-muted">{process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com"}</span></div>
+              <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-muted">密钥</span><span className="inline-flex min-w-0 items-center gap-1 text-right font-mono text-[10px]"><KeyRound className="h-3 w-3 shrink-0" /> {masked}</span></div>
             </div>
             <div className="mt-4"><ModelTest /></div>
           </Card>
@@ -44,12 +44,12 @@ export default async function SettingsPage() {
           <Card className="p-5">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted"><Database className="h-4 w-4 text-brand" /> 本地数据</div>
             <div className="mt-3 space-y-2 text-[12px]">
-              <div className="flex justify-between"><span className="text-muted">试卷</span><span>{papers} 份</span></div>
-              <div className="flex justify-between"><span className="text-muted">生成题目</span><span>{questions} 题</span></div>
-              <div className="flex justify-between"><span className="text-muted">作答记录</span><span>{attempts} 条</span></div>
-              <div className="flex justify-between"><span className="text-muted">随机刷题</span><span>{randoms} 题</span></div>
-              <div className="flex justify-between"><span className="text-muted">当前账号</span><span>{session.displayName}</span></div>
-              <div className="flex justify-between"><span className="text-muted">数据库</span><span className="font-mono text-[10px]">data/app.db</span></div>
+              <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-muted">试卷</span><span className="min-w-0 text-right">{papers} 份</span></div>
+              <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-muted">生成题目</span><span className="min-w-0 text-right">{questions} 题</span></div>
+              <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-muted">作答记录</span><span className="min-w-0 text-right">{attempts} 条</span></div>
+              <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-muted">随机刷题</span><span className="min-w-0 text-right">{randoms} 题</span></div>
+              <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-muted">当前账号</span><span className="min-w-0 truncate text-right">{session.displayName}</span></div>
+              <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-muted">数据库</span><span className="min-w-0 break-all text-right font-mono text-[10px]">data/app.db</span></div>
             </div>
             <p className="mt-4 text-[10px] leading-5 text-muted">清空或备份可直接操作 <code className="rounded bg-subtle px-1">data/app.db</code>。上传图片在 <code className="rounded bg-subtle px-1">data/uploads/</code>。</p>
             <div className="mt-3"><LogoutButton /></div>

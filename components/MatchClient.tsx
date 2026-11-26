@@ -205,7 +205,7 @@ export function MatchClient({ matchId, displayName, isGuest }: { matchId: string
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1000px] px-4 pt-5 sm:px-6 sm:pt-8">
+      <div className="mx-auto max-w-[1000px] px-4 pt-4 sm:px-6 sm:pt-8">
         {state.status === "waiting" && <WaitingCard state={state} onCancel={cancel} />}
         {state.status === "generating" && <GeneratingCard state={state} onCancel={cancel} />}
         {state.status === "ready" && <ReadyCard state={state} countdown={countdown} />}
@@ -289,17 +289,17 @@ function ReadyCard({ state, countdown }: { state: State; countdown: number }) {
 function Scoreboard({ state, finished }: { state: State; finished: boolean }) {
   const opp = state.opponent;
   return (
-    <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr]">
-      <div className="rounded-xl border border-brand/25 bg-brand-soft/50 px-4 py-3">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_auto_1fr] sm:gap-3">
+      <div className="rounded-xl border border-brand/25 bg-brand-soft/50 px-3 py-2.5 sm:px-4 sm:py-3">
         <div className="flex items-center justify-between text-[10px] text-muted"><span>我</span><span className="font-medium text-brand">{state.me.score} 分</span></div>
-        <div className="mt-1 truncate text-[13px] font-medium text-ink">{state.me.displayName}</div>
+        <div className="mt-1 truncate text-[12px] font-medium text-ink sm:text-[13px]">{state.me.displayName}</div>
         <ProgressLine value={state.me.currentIndex} total={state.total} />
         <div className="mt-1 text-[9px] text-muted">{state.me.currentIndex}/{state.total} 题{state.me.finished ? " · 已完成" : ""}</div>
       </div>
-      <div className="flex items-center justify-center text-[10px] text-faint"><Swords className="h-5 w-5" /> VS</div>
-      <div className={cn("rounded-xl border px-4 py-3", opp && opp.score > state.me.score ? "border-accent/25 bg-accent-soft/40" : "border-line bg-surface")}>
+      <div className="hidden items-center justify-center text-[10px] text-faint sm:flex"><Swords className="h-5 w-5" /> VS</div>
+      <div className={cn("rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3", opp && opp.score > state.me.score ? "border-accent/25 bg-accent-soft/40" : "border-line bg-surface")}>
         <div className="flex items-center justify-between text-[10px] text-muted"><span>对手</span><span className="font-medium text-ink">{opp?.score ?? 0} 分</span></div>
-        <div className="mt-1 truncate text-[13px] font-medium text-ink">{opp?.displayName || "等待对手"}</div>
+        <div className="mt-1 truncate text-[12px] font-medium text-ink sm:text-[13px]">{opp?.displayName || "等待对手"}</div>
         <ProgressLine value={opp?.currentIndex || 0} total={state.total} />
         <div className="mt-1 text-[9px] text-muted">{opp ? `${opp.currentIndex}/${state.total} 题${opp.finished ? " · 已完成" : ""}` : "未连接"}</div>
       </div>
@@ -309,7 +309,7 @@ function Scoreboard({ state, finished }: { state: State; finished: boolean }) {
 
 function ProgressLine({ value, total }: { value: number; total: number }) {
   return (
-    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-track">
+    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-track sm:mt-2">
       <div className="h-full rounded-full bg-brand transition-all duration-500" style={{ width: `${Math.min(100, (value / total) * 100)}%` }} />
     </div>
   );
@@ -321,7 +321,7 @@ function QuestionCard({ q, state, selected, feedback, submitting, remain, pctLef
 }) {
   const urgent = remain <= 10;
   return (
-    <div className="mt-4 rounded-2xl border border-line bg-surface p-5 sm:p-7">
+    <div className="mt-3 rounded-2xl border border-line bg-surface p-4 sm:mt-4 sm:p-7">
       <div className="flex flex-wrap items-center gap-2">
         <span className={cn("rounded-full px-2.5 py-1 text-[10px]", SUBJECT_STYLE[q.subject] || "bg-surface-2 text-muted")}>{SUBJECT_SHORT[q.subject] || q.subject}</span>
         <span className="text-[10px] text-muted">第 {q.number} 题 · {q.chapter}</span>

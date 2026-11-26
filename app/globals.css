@@ -85,7 +85,16 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .md-body pre code { background: transparent; padding: 0; color: inherit; font-size: inherit; }
 .md-body strong { font-weight: 650; }
 .md-body .katex-display { margin: 0.9rem 0; overflow-x: auto; overflow-y: hidden; padding: 0.15rem 0; }
-.md-body .katex { font-size: 1.02em; }
+.md-body .katex { font-size: 1.02em; max-width: 100%; }
+/* 行内公式在窄屏上不应被直接裁掉，允许公式自身横向滚动 */
+.md-body p > .katex, .md-body li > .katex, .md-body td > .katex, .md-body th > .katex {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  vertical-align: bottom;
+  -webkit-overflow-scrolling: touch;
+}
 .md-body img { max-width: 100%; }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }

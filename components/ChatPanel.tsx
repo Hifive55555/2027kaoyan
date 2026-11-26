@@ -133,7 +133,7 @@ export function ChatPanel({
             {messages.map((m, i) => (
               <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
                 <div className={cn(
-                  "max-w-[88%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-6",
+                  "max-w-[88%] break-words rounded-2xl px-3.5 py-2.5 text-[13px] leading-6",
                   m.role === "user" ? "rounded-br-md bg-ink text-paper" : "rounded-bl-md border border-line bg-surface text-ink"
                 )}>
                   {m.role === "assistant" ? <Markdown>{m.content}</Markdown> : <span className="whitespace-pre-wrap">{m.content}</span>}
@@ -176,7 +176,7 @@ export function ChatPanel({
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
               }}
               rows={2}
-              placeholder="继续追问… Enter 发送，Shift+Enter 换行"
+              placeholder="继续追问…"
               className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[12px] leading-5 outline-none placeholder:text-faint"
             />
             <button
