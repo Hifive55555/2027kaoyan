@@ -4,6 +4,7 @@ import { streamChatWithTools, type ChatMessageInput } from "@/lib/deepseek";
 import { buildTutorMessages } from "@/lib/prompts";
 import { TUTOR_TOOLS, executeTutorTool } from "@/lib/tutor-tools";
 import { limitTutorReply } from "@/lib/tutor";
+import { generateTutorConversationTitle } from "@/lib/tutor-title";
 import {
   getTutorCheck,
   getTutorCheckRaw,
@@ -15,7 +16,9 @@ import {
   getTutorQuiz,
   getTutorQuizRaw,
   getTutorRoadmap,
+  replaceTutorConversationTitle,
   saveTutorMessage,
+  titleTutorConversation,
 } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -37,6 +40,7 @@ function streamTutorReply(input: {
   currentUser: string;
   fallback: string;
   userMessageId?: string;
+  firstTurn?: boolean;
 }) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -145,6 +149,25 @@ function streamTutorReply(input: {
           quizId,
           checkId,
         );
+        let conversationTitle = getTutorConversation(input.userId, input.conversationId)?.title || "新的对话";
+        if (input.firstTurn) {
+          const titleAssistant = reply || (quizId ? getTutorQuizRaw(quizId, input.userId)?.stem || "" : "")
+            || (checkId ? getTutorCheckRaw(checkId, input.userId)?.prompt || "" : "");
+          try {
+            const generated = await generateTutorConversationTitle(input.currentUser, titleAssistant);
+            if (generated) {
+              const replaced = replaceTutorConversationTitle(
+                input.userId,
+                input.conversationId,
+                conversationTitle,
+                generated,
+              );
+              if (replaced) conversationTitle = replaced;
+            }
+          } catch {
+            // The provisional title from the student's first message is enough.
+          }
+        }
         send({
           done: true,
           message: {
@@ -154,7 +177,7 @@ function streamTutorReply(input: {
           },
           roadmap: getTutorRoadmap(input.userId, input.conversationId),
           conversationId: input.conversationId,
-          conversationTitle: getTutorConversation(input.userId, input.conversationId)?.title,
+          conversationTitle,
           extraMessages: [],
         });
       } catch (err) {
@@ -225,7 +248,9 @@ export async function POST(req: NextRequest) {
     if (!conversation) return Response.json({ error: "对话不存在" }, { status: 404 });
     if (conversation.archivedAt) return Response.json({ error: "对话已归档，请先取消归档" }, { status: 409 });
 
+    const firstTurn = conversation.title === "新的对话";
     const userMessage = saveTutorMessage(auth.userId, conversation.id, "user", message);
+    if (firstTurn) titleTutorConversation(auth.userId, conversation.id, message);
     return streamTutorReply({
       userId: auth.userId,
       conversationId: conversation.id,
@@ -233,6 +258,7 @@ export async function POST(req: NextRequest) {
       currentUser: message,
       fallback: "我先不急着讲完整。你能说说自己目前卡在哪一步吗？",
       userMessageId: userMessage.id,
+      firstTurn,
     });
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : "老师暂时没回答上来" }, { status: 502 });

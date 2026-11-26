@@ -1157,11 +1157,33 @@ export function listTutorConversations(userId: string, archived: boolean, query 
 export function titleTutorConversation(userId: string, id: string, message: string) {
   const row = getDb().prepare(`SELECT title FROM tutor_conversations WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
   if (!row || row.title !== "新的对话") return;
-  const title = String(message || "").replace(/\s+/g, " ").trim().slice(0, 32);
+  const title = String(message || "")
+    .replace(/^【系统事件】[^：:]*[：:]\s*/, "")
+    .replace(/\s+/g, " ")
+    .replace(/[。！？!?]+$/g, "")
+    .trim()
+    .slice(0, 24);
   if (title) {
     getDb().prepare(`UPDATE tutor_conversations SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
       .run(title, nowIso(), id, userId);
   }
+}
+
+// Only replace an auto-generated title. A user-renamed conversation must not
+// be overwritten by the delayed title-generation pass.
+export function replaceTutorConversationTitle(
+  userId: string,
+  id: string,
+  expectedTitle: string,
+  title: string,
+): string | null {
+  const clean = String(title || "").replace(/\s+/g, " ").trim().slice(0, 24);
+  if (!clean) return null;
+  const row = getDb().prepare(`SELECT title FROM tutor_conversations WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
+  if (!row || row.title !== expectedTitle) return null;
+  getDb().prepare(`UPDATE tutor_conversations SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
+    .run(clean, nowIso(), id, userId);
+  return clean;
 }
 
 export function getTutorConversationForQuiz(userId: string, quizId: string): string | null {
