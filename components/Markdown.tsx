@@ -28,7 +28,7 @@ export function Markdown({ children, className }: { children: string; className?
   return (
     <div className={cn("md-body", className)}>
       <ReactMarkdown
-        remarkPlugins={[remarkCjkFriendly, remarkGfm, remarkMath]}
+        remarkPlugins={[remarkCjkFriendly, [remarkGfm, { singleTilde: false }], remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
           a: ({ href, children }) => (
