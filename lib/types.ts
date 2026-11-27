@@ -237,6 +237,12 @@ export interface TutorMessage {
   sources?: TutorSource[];
   /** Retrieved sources the reply did not actually cite. */
   uncitedSources?: number;
+  /** Who produced this row. Supervisor rows are review feedback, not student speech. */
+  actor?: "student" | "teacher" | "supervisor" | "system";
+  /** Teacher message that the supervisor rejected (UI collapses it into the review card). */
+  rejected?: boolean;
+  /** Supervisor review -> the draft it reviewed. */
+  replyTo?: string;
 }
 
 export type TutorSourceType = "bank" | "knowledge" | "syllabus";

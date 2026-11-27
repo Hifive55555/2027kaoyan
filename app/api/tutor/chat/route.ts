@@ -5,6 +5,8 @@ import { buildTutorMessages } from "@/lib/prompts";
 import { TUTOR_TOOLS, executeTutorTool } from "@/lib/tutor-tools";
 import { createTutorSourceCollector, finalizeCitations, stripUnknownCitations } from "@/lib/tutor-sources";
 import { limitTutorReply } from "@/lib/tutor";
+import { reviewBody, reviewTutorDraft } from "@/lib/supervisor";
+import type { TutorMessage } from "@/lib/types";
 import { generateTutorConversationTitle } from "@/lib/tutor-title";
 import {
   getTutorCheck,
@@ -17,6 +19,7 @@ import {
   getTutorQuiz,
   getTutorQuizRaw,
   getTutorRoadmap,
+  markTutorMessageRejected,
   replaceTutorConversationTitle,
   saveTutorMessage,
   titleTutorConversation,
@@ -43,6 +46,157 @@ const TOOL_PHASE: Record<string, "searching" | "quiz" | "checking"> = {
   generate_check: "checking",
 };
 
+type TeacherHistoryRow = {
+  role: "user" | "assistant" | "tool";
+  content: string;
+  toolCalls?: TutorMessage["toolCalls"];
+  toolCallId?: string;
+  name?: string;
+};
+
+function toTeacherHistory(history: TutorMessage[]): TeacherHistoryRow[] {
+  return history.flatMap((message): TeacherHistoryRow[] => {
+    if (message.actor === "supervisor") {
+      // PASS is supervisor bookkeeping; only revision requests reach the teacher.
+      if (!message.content.startsWith("REVISE")) return [];
+      return [{ role: "user" as const, content: `【督导】${reviewBody(message.content)}` }];
+    }
+    return [{
+      role: message.role === "tool" ? "tool" as const : message.role === "assistant" ? "assistant" as const : "user" as const,
+      content: message.content,
+      toolCalls: message.toolCalls,
+      toolCallId: message.toolCallId,
+      name: message.toolName,
+    }];
+  });
+}
+
+async function runTutorTurn(input: {
+  userId: string;
+  conversationId: string;
+  history: TutorMessage[];
+  currentUser?: string;
+  fallback: string;
+  send: (obj: unknown) => void;
+}): Promise<{ message: TutorMessage; reply: string }> {
+  let full = "";
+  let quizId: string | undefined;
+  let checkId: string | undefined;
+  const sourceCollector = createTutorSourceCollector();
+  const send = input.send;
+  const messages: ChatMessageInput[] = buildTutorMessages({
+    history: toTeacherHistory(input.history),
+    currentUser: input.currentUser,
+  });
+
+  while (true) {
+    const round = await streamChatWithTools(messages, TUTOR_TOOLS, delta => {
+      full += delta;
+      send({ delta });
+    }, {
+      maxTokens: 4000,
+      temperature: 0.55,
+      effort: "high",
+    });
+
+    if (!round.toolCalls.length) break;
+
+    // Persist the assistant tool-call turn and feed the tool results back.
+    saveTutorMessage(
+      input.userId,
+      input.conversationId,
+      "assistant",
+      "",
+      undefined,
+      undefined,
+      { toolCalls: round.toolCalls, actor: "teacher", visible: false },
+    );
+    messages.push({
+      role: "assistant",
+      content: round.text || null,
+      tool_calls: round.toolCalls,
+    });
+
+    let terminal = false;
+    for (const call of round.toolCalls) {
+      const name = call.function?.name || "";
+      const args = parseArgs(call.function?.arguments || "{}");
+      const phase = TOOL_PHASE[name];
+      if (phase) send({ status: { phase } });
+      let toolResult: Awaited<ReturnType<typeof executeTutorTool>>;
+      try {
+        toolResult = await executeTutorTool(name, args, {
+          userId: input.userId,
+          conversationId: input.conversationId,
+          sources: sourceCollector,
+        });
+      } catch (err) {
+        toolResult = { result: { error: err instanceof Error ? err.message : "工具执行失败" } };
+      }
+      const found = sourceCollector.list();
+      if (found.length) send({ sources: found });
+      if (phase === "searching") send({ status: { phase, counts: sourceCollector.counts() } });
+      if (toolResult.quizId) {
+        quizId = toolResult.quizId;
+        terminal = true;
+      }
+      if (toolResult.checkId) {
+        checkId = toolResult.checkId;
+        terminal = true;
+      }
+      const content = JSON.stringify(toolResult.result);
+      saveTutorMessage(
+        input.userId,
+        input.conversationId,
+        "tool",
+        content,
+        undefined,
+        undefined,
+        { toolCallId: call.id, toolName: name, actor: "teacher", visible: false },
+      );
+      messages.push({
+        role: "tool",
+        tool_call_id: call.id,
+        name,
+        content,
+      });
+    }
+
+    // A generated card is a turn-ending action: the student must answer
+    // before the teacher continues. Without this boundary the model
+    // writes post-tool commentary that renders above the card.
+    if (terminal) break;
+    send({ status: { phase: "writing" } });
+  }
+
+  const rawReply = limitTutorReply(full.trim()) || (!quizId && !checkId ? input.fallback : "");
+  const cited = finalizeCitations(rawReply, sourceCollector.list());
+  const reply = stripUnknownCitations(rawReply, cited.sources);
+  const assistant = saveTutorMessage(
+    input.userId,
+    input.conversationId,
+    "assistant",
+    reply,
+    quizId,
+    checkId,
+    {
+      actor: "teacher",
+      ...(cited.sources.length ? { citations: { list: cited.sources, uncited: cited.uncited } } : {}),
+    },
+  );
+  return {
+    reply,
+    message: {
+      ...assistant,
+      actor: "teacher",
+      quiz: quizId ? getTutorQuiz(quizId, input.userId) || undefined : undefined,
+      check: checkId ? getTutorCheck(checkId, input.userId) || undefined : undefined,
+      sources: cited.sources.length ? cited.sources : undefined,
+      uncitedSources: cited.uncited || undefined,
+    },
+  };
+}
+
 function streamTutorReply(input: {
   userId: string;
   conversationId: string;
@@ -60,120 +214,70 @@ function streamTutorReply(input: {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
         } catch { /* client disconnected */ }
       };
-      let full = "";
-      let quizId: string | undefined;
-      let checkId: string | undefined;
-      const sourceCollector = createTutorSourceCollector();
-      let messages: ChatMessageInput[] = buildTutorMessages({
-        history: input.history.filter(m => m.role !== "system").map(m => ({
-          role: m.role === "tool" ? "tool" : m.role === "assistant" ? "assistant" : "user",
-          content: m.content,
-          toolCalls: m.toolCalls,
-          toolCallId: m.toolCallId,
-          name: m.toolName,
-        })),
-        currentUser: input.currentUser,
-      });
 
       try {
-        while (true) {
-          const round = await streamChatWithTools(messages, TUTOR_TOOLS, delta => {
-            full += delta;
-            send({ delta });
-          }, {
-            maxTokens: 4000,
-            temperature: 0.55,
-            effort: "high",
+        const first = await runTutorTurn({
+          userId: input.userId,
+          conversationId: input.conversationId,
+          history: input.history,
+          currentUser: input.currentUser,
+          fallback: input.fallback,
+          send,
+        });
+
+        // The first draft is already on screen. Review it once; a rejected
+        // draft is replaced by one revised answer, which is not reviewed again.
+        send({ status: { phase: "reviewing" } });
+        const verdict = await reviewTutorDraft({
+          userId: input.userId,
+          conversationId: input.conversationId,
+          history: getTutorHistory(input.userId, input.conversationId),
+        });
+
+        let delivered = first;
+        if (verdict.verdict === "revise" && verdict.critique) {
+          markTutorMessageRejected(input.userId, first.message.id);
+          const critique = saveTutorMessage(
+            input.userId,
+            input.conversationId,
+            "assistant",
+            verdict.critique,
+            undefined,
+            undefined,
+            { actor: "supervisor", replyTo: first.message.id },
+          );
+          send({
+            review: {
+              verdict: "revise",
+              message: { ...first.message, rejected: true },
+              supervision: { ...critique, actor: "supervisor", replyTo: first.message.id },
+            },
           });
-
-          if (!round.toolCalls.length) break;
-
-          // Persist the assistant tool-call turn and feed the tool results back.
+          send({ status: { phase: "revising" } });
+          delivered = await runTutorTurn({
+            userId: input.userId,
+            conversationId: input.conversationId,
+            history: getTutorHistory(input.userId, input.conversationId),
+            fallback: input.fallback,
+            send,
+          });
+        } else {
           saveTutorMessage(
             input.userId,
             input.conversationId,
             "assistant",
-            "",
+            "PASS",
             undefined,
             undefined,
-            { toolCalls: round.toolCalls },
+            { actor: "supervisor", visible: false, replyTo: first.message.id },
           );
-          messages.push({
-            role: "assistant",
-            content: round.text || null,
-            tool_calls: round.toolCalls,
-          });
-
-          let terminal = false;
-          for (const call of round.toolCalls) {
-            const name = call.function?.name || "";
-            const args = parseArgs(call.function?.arguments || "{}");
-            const phase = TOOL_PHASE[name];
-            if (phase) send({ status: { phase } });
-            let toolResult: Awaited<ReturnType<typeof executeTutorTool>>;
-            try {
-              toolResult = await executeTutorTool(name, args, {
-                userId: input.userId,
-                conversationId: input.conversationId,
-                sources: sourceCollector,
-              });
-            } catch (err) {
-              toolResult = { result: { error: err instanceof Error ? err.message : "工具执行失败" } };
-            }
-            const found = sourceCollector.list();
-            if (found.length) send({ sources: found });
-            if (phase === "searching") send({ status: { phase, counts: sourceCollector.counts() } });
-            if (toolResult.quizId) {
-              quizId = toolResult.quizId;
-              terminal = true;
-            }
-            if (toolResult.checkId) {
-              checkId = toolResult.checkId;
-              terminal = true;
-            }
-            const content = JSON.stringify(toolResult.result);
-            saveTutorMessage(
-              input.userId,
-              input.conversationId,
-              "tool",
-              content,
-              undefined,
-              undefined,
-              { toolCallId: call.id, toolName: name },
-            );
-            messages.push({
-              role: "tool",
-              tool_call_id: call.id,
-              name,
-              content,
-            });
-          }
-
-          // A generated card is a turn-ending action: the student must answer
-          // before the teacher continues. Without this boundary the model
-          // writes post-tool commentary that renders above the card.
-          if (terminal) break;
-          send({ status: { phase: "writing" } });
         }
 
-        const rawReply = limitTutorReply(full.trim()) || (!quizId && !checkId ? input.fallback : "");
-        const cited = finalizeCitations(rawReply, sourceCollector.list());
-        const reply = stripUnknownCitations(rawReply, cited.sources);
-        const assistant = saveTutorMessage(
-          input.userId,
-          input.conversationId,
-          "assistant",
-          reply,
-          quizId,
-          checkId,
-          cited.sources.length
-            ? { citations: { list: cited.sources, uncited: cited.uncited } }
-            : {},
-        );
         let conversationTitle = getTutorConversation(input.userId, input.conversationId)?.title || "新的对话";
         if (input.firstTurn) {
-          const titleAssistant = reply || (quizId ? getTutorQuizRaw(quizId, input.userId)?.stem || "" : "")
-            || (checkId ? getTutorCheckRaw(checkId, input.userId)?.prompt || "" : "");
+          const titleAssistant = delivered.reply
+            || (delivered.message.quiz ? getTutorQuizRaw(delivered.message.quiz.id, input.userId)?.stem || "" : "")
+            || (delivered.message.check ? getTutorCheckRaw(delivered.message.check.id, input.userId)?.prompt || "" : "");
           try {
             const generated = await generateTutorConversationTitle(input.currentUser || "", titleAssistant);
             if (generated) {
@@ -189,15 +293,10 @@ function streamTutorReply(input: {
             // The provisional title from the student's first message is enough.
           }
         }
+
         send({
           done: true,
-          message: {
-            ...assistant,
-            quiz: quizId ? getTutorQuiz(quizId, input.userId) || undefined : undefined,
-            check: checkId ? getTutorCheck(checkId, input.userId) || undefined : undefined,
-            sources: cited.sources.length ? cited.sources : undefined,
-            uncitedSources: cited.uncited || undefined,
-          },
+          message: delivered.message,
           roadmap: getTutorRoadmap(input.userId, input.conversationId),
           conversationId: input.conversationId,
           conversationTitle,

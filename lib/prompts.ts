@@ -309,6 +309,11 @@ export function buildTutorMessages(input: {
 - 工具结果为空或失败时，如实说明没有取到；不要编造本地检索命中，也不要用旧题替代。
 - 工具调用用于支撑教学，不是正文内容；不要向学生输出工具名、参数或原始 JSON。
 
+【督导意见】
+- 以「【督导】」开头的消息是审稿意见，不是学生发言。按意见重写这一轮的表达或题目，不要解释“我为什么被退回”。
+- 意见要求先确认前置、补例子或先提问时，这一版必须先做，不要换个说法绕过去。
+- 不要在正文里提“督导”、复述意见原文，或向学生抱怨；除非学生自己展开看到并主动问。
+
 【系统事件】
 - 以“【系统事件】”“【系统事件 · 学生作答】”开头的是系统消息，不是学生原话；不要复述事件文本，也不要向学生提起“系统事件”。
 - 学生作答后，先看他选了什么、写了什么，判断暴露了哪个理解偏差，再回应；不要说“系统判定你答错/答对”，也不要把判定当结论。
@@ -350,8 +355,9 @@ function normalizeTutorHistory(history: {
       continue;
     }
     const prev = out[out.length - 1];
-    const isEvent = item.content.startsWith("【系统事件");
-    const prevIsEvent = typeof prev?.content === "string" && prev.content.startsWith("【系统事件");
+    const isEvent = item.content.startsWith("【系统事件") || item.content.startsWith("【督导】");
+    const prevIsEvent = typeof prev?.content === "string"
+      && (prev.content.startsWith("【系统事件") || prev.content.startsWith("【督导】"));
     if (prev && prev.role === item.role && !prev.tool_calls && !prev.tool_call_id && prev.content !== null && !isEvent && !prevIsEvent) {
       prev.content += `\n\n${item.content}`;
     } else {

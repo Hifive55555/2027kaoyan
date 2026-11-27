@@ -672,16 +672,23 @@ export function saveTutorMessage(
   content: string,
   quizId?: string,
   checkId?: string,
-  extras: { toolCalls?: unknown; toolCallId?: string; toolName?: string; citations?: unknown; eventJson?: string } = {},
+  extras: {
+    toolCalls?: unknown; toolCallId?: string; toolName?: string; citations?: unknown; eventJson?: string;
+    actor?: "student" | "teacher" | "supervisor" | "system";
+    visible?: boolean; rejected?: boolean; replyTo?: string;
+  } = {},
 ): TutorMessage {
   const id = newId("tm");
   const createdAt = nowIso();
   const toolCalls = extras.toolCalls ? JSON.stringify(extras.toolCalls) : null;
   const citations = extras.citations ? JSON.stringify(extras.citations) : null;
+  const actor = extras.actor || (role === "user" ? "student" : role === "system" ? "system" : "teacher");
+  const visible = extras.visible === false ? 0 : 1;
+  const rejected = extras.rejected ? 1 : 0;
   getDb().prepare(
-    `INSERT INTO tutor_messages (id, user_id, conversation_id, role, content, quiz_id, check_id, tool_calls, tool_call_id, tool_name, sources, event_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, userId, conversationId, role, content, quizId || null, checkId || null, toolCalls, extras.toolCallId || null, extras.toolName || null, citations, extras.eventJson || null, createdAt);
+    `INSERT INTO tutor_messages (id, user_id, conversation_id, role, content, quiz_id, check_id, tool_calls, tool_call_id, tool_name, sources, event_json, actor, visible, rejected, reply_to, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, userId, conversationId, role, content, quizId || null, checkId || null, toolCalls, extras.toolCallId || null, extras.toolName || null, citations, extras.eventJson || null, actor, visible, rejected, extras.replyTo || null, createdAt);
   getDb().prepare(`UPDATE tutor_conversations SET updated_at = ? WHERE id = ? AND user_id = ?`)
     .run(createdAt, conversationId, userId);
   return {
@@ -701,8 +708,8 @@ export function deleteTutorMessage(userId: string, id: string) {
 export function getTutorMessages(userId: string, conversationId: string, limit?: number): TutorMessage[] {
   const db = getDb();
   const rows = (limit
-    ? db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? AND role != 'tool' ORDER BY created_at DESC LIMIT ?`).all(userId, conversationId, limit)
-    : db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? AND role != 'tool' ORDER BY created_at DESC`).all(userId, conversationId)) as Row[];
+    ? db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? AND role != 'tool' AND visible = 1 ORDER BY rowid DESC LIMIT ?`).all(userId, conversationId, limit)
+    : db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? AND role != 'tool' AND visible = 1 ORDER BY rowid DESC`).all(userId, conversationId)) as Row[];
   return rows.reverse().filter(row => !(row.role === "assistant" && row.tool_calls && !row.content)).map(row => {
     const citations = parseTutorCitations(row.sources);
     return {
@@ -714,20 +721,27 @@ export function getTutorMessages(userId: string, conversationId: string, limit?:
       check: row.check_id ? getTutorCheck(row.check_id, userId) || undefined : undefined,
       sources: citations?.sources,
       uncitedSources: citations?.uncited,
+      actor: row.actor || undefined,
+      rejected: Number(row.rejected) === 1 || undefined,
+      replyTo: row.reply_to || undefined,
     };
   });
 }
 
+export function markTutorMessageRejected(userId: string, id: string) {
+  getDb().prepare(`UPDATE tutor_messages SET rejected = 1 WHERE id = ? AND user_id = ?`).run(id, userId);
+}
+
 export function getTutorHistory(userId: string, conversationId: string, excludeId?: string): TutorMessage[] {
   const rows = getDb().prepare(
-    `SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? ${excludeId ? "AND id != ?" : ""} ORDER BY created_at ASC`
+    `SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? ${excludeId ? "AND id != ?" : ""} ORDER BY rowid ASC`
   ).all(...(excludeId ? [userId, conversationId, excludeId] : [userId, conversationId])) as Row[];
   return rows.flatMap((row): TutorMessage[] => {
     // Answer events are dialogue, not UI-only chips: the teacher must keep
     // seeing "the student answered Q with X" on later turns.
     if (row.role === "system") {
       const event = String(row.event_json || "").trim();
-      return event ? [{ id: row.id, role: "user" as const, content: event, createdAt: row.created_at }] : [];
+      return event ? [{ id: row.id, role: "user" as const, content: event, createdAt: row.created_at, actor: "system" as const }] : [];
     }
     return [{
       id: row.id,
@@ -739,6 +753,9 @@ export function getTutorHistory(userId: string, conversationId: string, excludeI
       toolCalls: row.tool_calls ? parseJson(row.tool_calls, undefined) : undefined,
       toolCallId: row.tool_call_id || undefined,
       toolName: row.tool_name || undefined,
+      actor: (row.actor || (row.role === "user" ? "student" : "teacher")) as TutorMessage["actor"],
+      rejected: Number(row.rejected) === 1 || undefined,
+      replyTo: row.reply_to || undefined,
     }];
   });
 }
@@ -1129,7 +1146,7 @@ export function getTutorConversation(userId: string, id: string): TutorConversat
   const db = getDb();
   const row = db.prepare(`SELECT * FROM tutor_conversations WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
   if (!row) return null;
-  const visible = `role != 'tool' AND NOT (role = 'assistant' AND tool_calls IS NOT NULL AND content = '')`;
+  const visible = `visible = 1 AND rejected = 0 AND role != 'tool' AND COALESCE(actor, '') != 'supervisor' AND NOT (role = 'assistant' AND tool_calls IS NOT NULL AND content = '')`;
   const stat = db.prepare(`SELECT COUNT(*) AS n, MAX(created_at) AS last_at FROM tutor_messages WHERE conversation_id = ? AND user_id = ? AND ${visible}`).get(id, userId) as Row;
   const last = db.prepare(`SELECT content FROM tutor_messages WHERE conversation_id = ? AND user_id = ? AND ${visible} ORDER BY created_at DESC LIMIT 1`).get(id, userId) as Row | undefined;
   return {
@@ -1185,9 +1202,9 @@ export function listTutorConversations(userId: string, archived: boolean, query 
   const like = `%${q}%`;
   const rows = db.prepare(
     `SELECT c.*,
-       (SELECT COUNT(*) FROM tutor_messages m WHERE m.conversation_id = c.id AND m.role != 'tool' AND NOT (m.role = 'assistant' AND m.tool_calls IS NOT NULL AND m.content = '')) AS message_count,
-       (SELECT content FROM tutor_messages m WHERE m.conversation_id = c.id AND m.role != 'tool' AND NOT (m.role = 'assistant' AND m.tool_calls IS NOT NULL AND m.content = '') ORDER BY m.created_at DESC LIMIT 1) AS last_message,
-       (SELECT MAX(created_at) FROM tutor_messages m WHERE m.conversation_id = c.id AND m.role != 'tool' AND NOT (m.role = 'assistant' AND m.tool_calls IS NOT NULL AND m.content = '')) AS last_message_at
+       (SELECT COUNT(*) FROM tutor_messages m WHERE m.conversation_id = c.id AND m.visible = 1 AND m.rejected = 0 AND m.role != 'tool' AND COALESCE(m.actor, '') != 'supervisor' AND NOT (m.role = 'assistant' AND m.tool_calls IS NOT NULL AND m.content = '')) AS message_count,
+       (SELECT content FROM tutor_messages m WHERE m.conversation_id = c.id AND m.visible = 1 AND m.rejected = 0 AND m.role != 'tool' AND COALESCE(m.actor, '') != 'supervisor' AND NOT (m.role = 'assistant' AND m.tool_calls IS NOT NULL AND m.content = '') ORDER BY m.rowid DESC LIMIT 1) AS last_message,
+       (SELECT MAX(m.created_at) FROM tutor_messages m WHERE m.conversation_id = c.id AND m.visible = 1 AND m.rejected = 0 AND m.role != 'tool' AND COALESCE(m.actor, '') != 'supervisor' AND NOT (m.role = 'assistant' AND m.tool_calls IS NOT NULL AND m.content = '')) AS last_message_at
      FROM tutor_conversations c
      WHERE c.user_id = ?
        AND ${archived ? "c.archived_at IS NOT NULL" : "c.archived_at IS NULL"}

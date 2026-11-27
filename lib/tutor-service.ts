@@ -10,7 +10,7 @@ export async function generateTutorQuizDraft(
   topic?: string,
 ): Promise<{ quizId: string; quiz: NonNullable<ReturnType<typeof getTutorQuizRaw>> }> {
   const history = getTutorMessages(userId, conversationId, 20)
-    .filter(m => m.role !== "system" && m.content.trim())
+    .filter(m => m.role !== "system" && m.actor !== "supervisor" && !m.rejected && m.content.trim())
     .map(m => ({ role: m.role as "user" | "assistant", content: m.content.replace(/\[\[S\d+\]\]/g, "") }));
   const profile = buildLearnerProfile(userId);
   const raw = await chatJson<TutorQuizDraft>(buildTutorQuizMessages({

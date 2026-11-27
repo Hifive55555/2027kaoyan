@@ -15,6 +15,7 @@ import { TutorConversationModal } from "./TutorConversationModal";
 import { TutorSources } from "./TutorSources";
 import { TutorCitation } from "./TutorCitation";
 import { TutorSourceModal } from "./TutorSourceModal";
+import { TutorSupervisionCard } from "./TutorSupervisionCard";
 
 function pct(n: number) {
   return `${Math.round(n)}%`;
@@ -30,6 +31,8 @@ const STATUS_TEXT: Record<string, string> = {
   quiz: "老师正在出题",
   checking: "老师正在准备检查题",
   writing: "老师正在组织语言",
+  reviewing: "督导正在复核",
+  revising: "老师正在按督导意见重写",
 };
 
 function statusCounts(counts?: Partial<Record<string, number>>) {
@@ -195,6 +198,9 @@ export function TutorClient({
     setTurnStatus({ phase: "thinking" });
     setLiveSources([]);
     let done = false;
+    // The reply can be rejected and rewritten in the same request, so track
+    // whichever placeholder is currently streaming.
+    let activeId = tempId;
     // Keep "查资料" on screen long enough to read: local lookups finish in a
     // few milliseconds, so without a floor the status would never paint.
     let searchingSince = 0;
@@ -244,10 +250,29 @@ export function TutorClient({
           if (Array.isArray(data.sources)) {
             setLiveSources(data.sources as TutorSource[]);
           }
+          if (data.review) {
+            // The supervisor rejected this draft: keep it, show the review,
+            // and open a fresh placeholder for the rewritten answer.
+            const rejected = { ...data.review.message, rejected: true } as TutorMessage;
+            const supervision = data.review.supervision as TutorMessage;
+            const nextId = `stream-rev-${Date.now()}`;
+            acc = "";
+            activeId = nextId;
+            if (statusTimer) { clearTimeout(statusTimer); statusTimer = null; }
+            setLiveSources([]);
+            setMessages(prev => [
+              ...prev.filter(m => m.id !== tempId && m.id !== nextId),
+              rejected,
+              supervision,
+              { id: nextId, role: "assistant", content: "", createdAt: new Date().toISOString() },
+            ]);
+            setStreamingId(nextId);
+            continue;
+          }
           if (data.delta) {
             acc += data.delta;
             const visible = visibleTutorText(acc);
-            setMessages(prev => prev.map(m => m.id === tempId ? { ...m, content: visible } : m));
+            setMessages(prev => prev.map(m => m.id === activeId ? { ...m, content: visible } : m));
           }
           if (data.done) {
             done = true;
@@ -255,10 +280,11 @@ export function TutorClient({
             setTurnStatus(null);
             setLiveSources([]);
             setMessages(prev => [
-              ...prev.filter(m => m.id !== tempId),
+              ...prev.filter(m => m.id !== activeId),
               data.message,
               ...(Array.isArray(data.extraMessages) ? data.extraMessages : []),
             ]);
+            setStreamingId(null);
             if (data.roadmap) setRoadmap(data.roadmap);
             if (data.conversationTitle) setConversation(prev => ({ ...prev, title: data.conversationTitle }));
           }
@@ -267,7 +293,7 @@ export function TutorClient({
       if (!done) throw new Error("连接中断了，老师的话没有传完");
       refreshProfile();
     } catch (err) {
-      const remove = new Set([tempId, ...(opts.removeIds || [])]);
+      const remove = new Set([tempId, activeId, ...(opts.removeIds || [])]);
       setMessages(prev => prev.filter(m => !remove.has(m.id)));
       if (opts.restoreInput) setInput(opts.restoreInput);
       setError(err instanceof Error ? err.message : "老师暂时没回答上来");
@@ -470,6 +496,19 @@ export function TutorClient({
                       </div>
                     );
                   }
+                  if (message.actor === "supervisor") {
+                    const draft = messages.find(item => item.id === message.replyTo);
+                    return (
+                      <div key={message.id} className="flex justify-start">
+                        <div className="w-full max-w-none">
+                          <TutorSupervisionCard critique={message.content} draft={draft} />
+                        </div>
+                      </div>
+                    );
+                  }
+                  // A rejected draft is shown inside the supervision card, not
+                  // as a standalone teacher reply.
+                  if (message.rejected) return null;
                   return (
                     <div key={message.id} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
                       <div className={cn(
@@ -533,6 +572,14 @@ export function TutorClient({
                     </div>
                   );
                 })}
+                {loading && statusKey === "reviewing" && (
+                  <div className="flex justify-start">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-[10px] text-muted">
+                      <Loader2 className="h-3 w-3 animate-spin text-brand" />
+                      督导正在复核…
+                    </div>
+                  </div>
+                )}
                 {error && (
                   <div className="flex items-start gap-2 rounded-xl border border-accent/20 bg-accent-soft px-3 py-2 text-[11px] leading-5 text-accent">
                     <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
