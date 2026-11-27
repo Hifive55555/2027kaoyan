@@ -672,16 +672,16 @@ export function saveTutorMessage(
   content: string,
   quizId?: string,
   checkId?: string,
-  extras: { toolCalls?: unknown; toolCallId?: string; toolName?: string; citations?: unknown } = {},
+  extras: { toolCalls?: unknown; toolCallId?: string; toolName?: string; citations?: unknown; eventJson?: string } = {},
 ): TutorMessage {
   const id = newId("tm");
   const createdAt = nowIso();
   const toolCalls = extras.toolCalls ? JSON.stringify(extras.toolCalls) : null;
   const citations = extras.citations ? JSON.stringify(extras.citations) : null;
   getDb().prepare(
-    `INSERT INTO tutor_messages (id, user_id, conversation_id, role, content, quiz_id, check_id, tool_calls, tool_call_id, tool_name, sources, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, userId, conversationId, role, content, quizId || null, checkId || null, toolCalls, extras.toolCallId || null, extras.toolName || null, citations, createdAt);
+    `INSERT INTO tutor_messages (id, user_id, conversation_id, role, content, quiz_id, check_id, tool_calls, tool_call_id, tool_name, sources, event_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, userId, conversationId, role, content, quizId || null, checkId || null, toolCalls, extras.toolCallId || null, extras.toolName || null, citations, extras.eventJson || null, createdAt);
   getDb().prepare(`UPDATE tutor_conversations SET updated_at = ? WHERE id = ? AND user_id = ?`)
     .run(createdAt, conversationId, userId);
   return {
@@ -722,17 +722,52 @@ export function getTutorHistory(userId: string, conversationId: string, excludeI
   const rows = getDb().prepare(
     `SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? ${excludeId ? "AND id != ?" : ""} ORDER BY created_at ASC`
   ).all(...(excludeId ? [userId, conversationId, excludeId] : [userId, conversationId])) as Row[];
-  return rows.filter(row => row.role !== "system").map(row => ({
-    id: row.id,
-    role: row.role === "assistant" ? "assistant" as const : row.role === "tool" ? "tool" as const : "user" as const,
-    content: row.content,
-    createdAt: row.created_at,
-    quiz: row.quiz_id ? getTutorQuiz(row.quiz_id, userId) || undefined : undefined,
-    check: row.check_id ? getTutorCheck(row.check_id, userId) || undefined : undefined,
-    toolCalls: row.tool_calls ? parseJson(row.tool_calls, undefined) : undefined,
-    toolCallId: row.tool_call_id || undefined,
-    toolName: row.tool_name || undefined,
-  }));
+  return rows.flatMap((row): TutorMessage[] => {
+    // Answer events are dialogue, not UI-only chips: the teacher must keep
+    // seeing "the student answered Q with X" on later turns.
+    if (row.role === "system") {
+      const event = String(row.event_json || "").trim();
+      return event ? [{ id: row.id, role: "user" as const, content: event, createdAt: row.created_at }] : [];
+    }
+    return [{
+      id: row.id,
+      role: row.role === "assistant" ? "assistant" as const : row.role === "tool" ? "tool" as const : "user" as const,
+      content: row.content,
+      createdAt: row.created_at,
+      quiz: row.quiz_id ? getTutorQuiz(row.quiz_id, userId) || undefined : undefined,
+      check: row.check_id ? getTutorCheck(row.check_id, userId) || undefined : undefined,
+      toolCalls: row.tool_calls ? parseJson(row.tool_calls, undefined) : undefined,
+      toolCallId: row.tool_call_id || undefined,
+      toolName: row.tool_name || undefined,
+    }];
+  });
+}
+
+/**
+ * How far the conversation moved on between issuing a quiz/check and answering
+ * it. 0 means the student answered immediately, so the event can stay short.
+ */
+export function getAnswerContext(
+  userId: string,
+  conversationId: string,
+  card: { quizId?: string; checkId?: string },
+): { turnsAfter: number; topics: string[] } {
+  const db = getDb();
+  const cardId = card.quizId || card.checkId || "";
+  const column = card.quizId ? "quiz_id" : "check_id";
+  const row = db.prepare(
+    `SELECT created_at FROM tutor_messages WHERE user_id = ? AND conversation_id = ? AND role = 'assistant' AND ${column} = ? ORDER BY created_at DESC LIMIT 1`
+  ).get(userId, conversationId, cardId) as Row | undefined;
+  if (!row) return { turnsAfter: 0, topics: [] };
+  const asked = db.prepare(
+    `SELECT content FROM tutor_messages WHERE user_id = ? AND conversation_id = ? AND role = 'user' AND created_at > ? ORDER BY created_at ASC`
+  ).all(userId, conversationId, row.created_at) as Row[];
+  const topics = asked
+    .map(item => String(item.content || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(-2)
+    .map(text => text.length > 18 ? `${text.slice(0, 18)}…` : text);
+  return { turnsAfter: asked.length, topics };
 }
 
 export function saveTutorQuizAttempt(userId: string, quizId: string, answer: string, correct: boolean) {

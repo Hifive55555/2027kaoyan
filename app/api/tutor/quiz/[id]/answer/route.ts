@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireUserApi } from "@/lib/auth";
-import { getTutorQuizRaw, saveTutorQuizAttempt, getTutorQuiz, saveTutorMessage, getTutorConversation, getTutorConversationForQuiz, getOrCreateActiveTutorConversation } from "@/lib/queries";
+import { getTutorQuizRaw, saveTutorQuizAttempt, getTutorQuiz, saveTutorMessage, getTutorConversation, getTutorConversationForQuiz, getOrCreateActiveTutorConversation, getAnswerContext } from "@/lib/queries";
+import { buildQuizAnswerEvent } from "@/lib/tutor-events";
 
 export const runtime = "nodejs";
 
@@ -21,11 +22,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     saveTutorQuizAttempt(auth.userId, id, answer, correct);
     const conversationId = getTutorConversationForQuiz(auth.userId, id) || getOrCreateActiveTutorConversation(auth.userId).id;
     if (getTutorConversation(auth.userId, conversationId)?.archivedAt) return Response.json({ error: "对话已归档，请先取消归档" }, { status: 409 });
+    const { chip, event } = buildQuizAnswerEvent({
+      quiz,
+      answer,
+      correct,
+      context: getAnswerContext(auth.userId, conversationId, { quizId: id }),
+    });
     const systemMessage = saveTutorMessage(
       auth.userId,
       conversationId,
       "system",
-      `【系统事件】学生提交了答案：${answer}`
+      chip,
+      undefined,
+      undefined,
+      { eventJson: event },
     );
     return Response.json({ correct, quiz: getTutorQuiz(id, auth.userId), systemMessage });
   } catch (err) {

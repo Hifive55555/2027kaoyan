@@ -47,7 +47,7 @@ function streamTutorReply(input: {
   userId: string;
   conversationId: string;
   history: ReturnType<typeof getTutorHistory>;
-  currentUser: string;
+  currentUser?: string;
   fallback: string;
   userMessageId?: string;
   firstTurn?: boolean;
@@ -175,7 +175,7 @@ function streamTutorReply(input: {
           const titleAssistant = reply || (quizId ? getTutorQuizRaw(quizId, input.userId)?.stem || "" : "")
             || (checkId ? getTutorCheckRaw(checkId, input.userId)?.prompt || "" : "");
           try {
-            const generated = await generateTutorConversationTitle(input.currentUser, titleAssistant);
+            const generated = await generateTutorConversationTitle(input.currentUser || "", titleAssistant);
             if (generated) {
               const replaced = replaceTutorConversationTitle(
                 input.userId,
@@ -237,11 +237,13 @@ export async function POST(req: NextRequest) {
       const conversationId = String(body.conversationId || "") || getTutorConversationForQuiz(auth.userId, eventQuizId);
       const conversation = conversationId ? getTutorConversation(auth.userId, conversationId) : null;
       if (!conversation || conversation.archivedAt) return Response.json({ error: "对话不存在或已归档" }, { status: 409 });
+      const history = getTutorHistory(auth.userId, conversation.id);
+      const persisted = history[history.length - 1]?.content?.startsWith("【系统事件") === true;
       return streamTutorReply({
         userId: auth.userId,
         conversationId: conversation.id,
-        history: getTutorHistory(auth.userId, conversation.id),
-        currentUser: `【系统事件】学生提交了答案：${quiz.attempt.answer}`,
+        history,
+        currentUser: persisted ? undefined : `【系统事件】学生提交了答案：${quiz.attempt.answer}`,
         fallback: "我们先停一下。你觉得刚才那一步的关键是什么？",
       });
     }
@@ -253,11 +255,13 @@ export async function POST(req: NextRequest) {
       const conversationId = String(body.conversationId || "") || getTutorConversationForCheck(auth.userId, eventCheckId);
       const conversation = conversationId ? getTutorConversation(auth.userId, conversationId) : null;
       if (!conversation || conversation.archivedAt) return Response.json({ error: "对话不存在或已归档" }, { status: 409 });
+      const history = getTutorHistory(auth.userId, conversation.id);
+      const persisted = history[history.length - 1]?.content?.startsWith("【系统事件") === true;
       return streamTutorReply({
         userId: auth.userId,
         conversationId: conversation.id,
-        history: getTutorHistory(auth.userId, conversation.id),
-        currentUser: `【系统事件】学生提交了答案：${check.attempt.response}`,
+        history,
+        currentUser: persisted ? undefined : `【系统事件】学生提交了答案：${check.attempt.response}`,
         fallback: "我们先停一下。你觉得自己刚才那一步的关键是什么？",
       });
     }

@@ -309,6 +309,11 @@ export function buildTutorMessages(input: {
 - 工具结果为空或失败时，如实说明没有取到；不要编造本地检索命中，也不要用旧题替代。
 - 工具调用用于支撑教学，不是正文内容；不要向学生输出工具名、参数或原始 JSON。
 
+【系统事件】
+- 以“【系统事件】”“【系统事件 · 学生作答】”开头的是系统消息，不是学生原话；不要复述事件文本，也不要向学生提起“系统事件”。
+- 学生作答后，先看他选了什么、写了什么，判断暴露了哪个理解偏差，再回应；不要说“系统判定你答错/答对”，也不要把判定当结论。
+- 事件里的“位置”说明这道题是几轮前发出的；要针对那一道题回应，不要顺势接着最近在聊的话题讲。
+
 【学习路线】
 学习路线是学生的实时学习路径，不是教材目录的复制品。发现前置概念缺失就插入子项，学生已经会了就标记完成或跳过，卡住就拆小。路线状态只通过 update_learning_roadmap 工具或用户手动点击改变；不要在正文里假装已经同步路线。
 - 路线里标有“（学生手动标记，未经验证）”的项，是学生自己点的完成。不要直接接受，也不要直接推翻：先用一个复述问题或最小应用题确认，再决定标记完成还是退回进行中。
@@ -345,8 +350,13 @@ function normalizeTutorHistory(history: {
       continue;
     }
     const prev = out[out.length - 1];
-    if (prev && prev.role === item.role && !prev.tool_calls && !prev.tool_call_id && prev.content !== null) prev.content += `\n\n${item.content}`;
-    else out.push({ role: item.role, content: item.content });
+    const isEvent = item.content.startsWith("【系统事件");
+    const prevIsEvent = typeof prev?.content === "string" && prev.content.startsWith("【系统事件");
+    if (prev && prev.role === item.role && !prev.tool_calls && !prev.tool_call_id && prev.content !== null && !isEvent && !prevIsEvent) {
+      prev.content += `\n\n${item.content}`;
+    } else {
+      out.push({ role: item.role, content: item.content });
+    }
   }
   while (out.length && out[0].role !== "user") out.shift();
   return out;

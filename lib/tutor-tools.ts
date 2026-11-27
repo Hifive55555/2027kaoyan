@@ -233,10 +233,10 @@ export async function executeTutorTool(
     case "generate_quiz": {
       const topic = text(args.topic, 100) || undefined;
       const { quizId, quiz } = await generateTutorQuizDraft(ctx.userId, ctx.conversationId, topic);
+      // The id stays server-side; the model only needs the question itself.
       return {
         quizId,
         result: {
-          quizId,
           stem: quiz.stem,
           options: quiz.options,
           answer: quiz.answer,
@@ -261,7 +261,6 @@ export async function executeTutorTool(
       return {
         checkId,
         result: {
-          checkId,
           kind,
           prompt,
           options,

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireUserApi } from "@/lib/auth";
-import { getTutorCheck, getTutorCheckRaw, saveTutorCheckAttempt, saveTutorMessage, getTutorConversation, getTutorConversationForCheck, getOrCreateActiveTutorConversation } from "@/lib/queries";
+import { getTutorCheck, getTutorCheckRaw, saveTutorCheckAttempt, saveTutorMessage, getTutorConversation, getTutorConversationForCheck, getOrCreateActiveTutorConversation, getAnswerContext } from "@/lib/queries";
+import { buildCheckAnswerEvent } from "@/lib/tutor-events";
 
 export const runtime = "nodejs";
 
@@ -23,11 +24,19 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     // Record the raw answer only. The teacher already has the generated
     // question and expected answer in its tool-call history.
     saveTutorCheckAttempt(auth.userId, id, response, null);
+    const { chip, event } = buildCheckAnswerEvent({
+      check,
+      response,
+      context: getAnswerContext(auth.userId, conversationId, { checkId: id }),
+    });
     const systemMessage = saveTutorMessage(
       auth.userId,
       conversationId,
       "system",
-      `【系统事件】学生提交了答案：${response}`
+      chip,
+      undefined,
+      undefined,
+      { eventJson: event },
     );
     return Response.json({ check: getTutorCheck(id, auth.userId), systemMessage, correct: null });
   } catch (err) {
