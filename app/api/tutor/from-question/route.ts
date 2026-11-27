@@ -3,10 +3,12 @@ import { requireUserApi } from "@/lib/auth";
 import {
   createTutorConversation,
   createTutorQuiz,
+  getLatestAttempt,
   getQuestion,
   saveTutorMessage,
+  saveTutorQuizAttempt,
 } from "@/lib/queries";
-import { getRandomQuestionDetail } from "@/lib/random";
+import { getLatestRandomAttempt, getRandomQuestionDetail } from "@/lib/random";
 import { SUBJECTS } from "@/lib/subjects";
 import type { SubjectId } from "@/lib/types";
 
@@ -71,11 +73,26 @@ export async function POST(req: NextRequest) {
       explanation,
     });
 
+    // Bring the original attempt over so the card opens in the answered state
+    // with the explanation visible, exactly as it looked in the follow-up.
+    const randomAttempt = random ? getLatestRandomAttempt(auth.userId, questionId) : null;
+    const paperAttempt = paperOwned ? getLatestAttempt(questionId) : null;
+    const clientAttempt = body?.attempt && typeof body.attempt === "object" ? body.attempt : null;
+    const attemptAnswer = clip(randomAttempt?.answer || paperAttempt?.answer || clientAttempt?.answer, 40);
+    const attemptCorrect = randomAttempt
+      ? randomAttempt.correct
+      : paperAttempt
+        ? paperAttempt.verdict === "correct"
+        : clientAttempt?.correct === true;
+    if (attemptAnswer) {
+      saveTutorQuizAttempt(auth.userId, quizId, attemptAnswer, attemptCorrect);
+    }
+
     const title = clip(topic || chapter || "追问转答疑", 20) || "追问转答疑";
     const conversation = createTutorConversation(auth.userId, title);
 
-    // Short lead so the transcript starts with a user turn; the question itself
-    // is rendered as a quiz card, not pasted into the text.
+    // Hidden lead: the model needs a user turn before the card, the student
+    // does not need to read a synthetic line.
     saveTutorMessage(
       auth.userId,
       conversation.id,
@@ -83,7 +100,7 @@ export async function POST(req: NextRequest) {
       "我们把刚才追问的这道题带到答疑里继续。",
       undefined,
       undefined,
-      { actor: "student" },
+      { actor: "student", visible: false },
     );
 
     // Mirror a normal generate_quiz turn so the tutor's model context contains
@@ -115,7 +132,7 @@ export async function POST(req: NextRequest) {
       auth.userId,
       conversation.id,
       "assistant",
-      "我们把这道题放在这里，接着刚才的追问。",
+      "",
       quizId,
       undefined,
       { actor: "teacher" },
