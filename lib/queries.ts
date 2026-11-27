@@ -728,6 +728,12 @@ export function getTutorMessages(userId: string, conversationId: string, limit?:
   });
 }
 
+export function attachTutorCard(userId: string, messageId: string, card: { quizId?: string; checkId?: string }) {
+  getDb().prepare(
+    `UPDATE tutor_messages SET quiz_id = COALESCE(?, quiz_id), check_id = COALESCE(?, check_id) WHERE id = ? AND user_id = ?`
+  ).run(card.quizId || null, card.checkId || null, messageId, userId);
+}
+
 export function markTutorMessageRejected(userId: string, id: string) {
   getDb().prepare(`UPDATE tutor_messages SET rejected = 1 WHERE id = ? AND user_id = ?`).run(id, userId);
 }

@@ -18,6 +18,7 @@ import {
   getTutorHistory,
   getTutorQuiz,
   getTutorQuizRaw,
+  attachTutorCard,
   getTutorRoadmap,
   markTutorMessageRejected,
   replaceTutorConversationTitle,
@@ -266,7 +267,7 @@ function streamTutorReply(input: {
               input.userId,
               input.conversationId,
               "user",
-              `（上一版已撤回，请针对下面的问题重答）\n${retry}`,
+              `（上一版已撤回，请针对下面的问题重答。若这一版需要出题，必须重新调用 generate_quiz 或 generate_check，上一版的题卡不会自动显示。）\n${retry}`,
               undefined,
               undefined,
               { actor: "system", visible: false },
@@ -287,6 +288,20 @@ function streamTutorReply(input: {
             fallback: input.fallback,
             send,
           });
+          // The rewrite sometimes refers to "下面这道题" without calling
+          // generate_quiz again. Keep the card from the rejected draft so the
+          // student is not left with a dangling promise.
+          const cardRef = /(下面这道题|这道题|这道选择题|这道判断题|这道填空题|请选择|请作答|选一个|作答)/;
+          if (!delivered.message.quiz && !delivered.message.check && cardRef.test(delivered.message.content)) {
+            const quizId = first.message.quiz?.id;
+            const checkId = first.message.check?.id;
+            if (quizId || checkId) {
+              attachTutorCard(input.userId, delivered.message.id, { quizId, checkId });
+              delivered.message.quiz = quizId ? getTutorQuiz(quizId, input.userId) || undefined : undefined;
+              delivered.message.check = checkId ? getTutorCheck(checkId, input.userId) || undefined : undefined;
+              console.log(`[supervisor] carried card from rejected draft conv=${input.conversationId}`);
+            }
+          }
         } else {
           saveTutorMessage(
             input.userId,
