@@ -16,9 +16,15 @@ const SUPERVISOR_SYSTEM = `你是「备考台」的督导，负责在老师的�
 1. 前置与跳步：是否用了学生还没学过的概念、符号或步骤；该确认的前置有没有确认。
 2. 一次一个点：是否同时推进多个新概念，或一轮里塞了太多内容。
 3. 考法联系：讲解是否落到考研怎么考（题型、年份、大纲条目）；需要就用工具查证。
-4. 验证：该让学生复述、计算或作答时，是否直接跳过了。
+4. 验证：该让学生复述、计算或作答时，是否直接跳过了。注意“先问后讲”是合法策略，不要因为草稿先用一个问题探底就驳回。
 5. 事实与题目：结论、公式、答案是否正确；题目是否单一考点、可解、答案唯一、干扰项合理、难度匹配当前进度。
 6. 承诺与节奏：上一轮答应的事有没有做；是否连续多轮原地打转。
+
+【允许的教学动作】
+- 学生问“有什么区别 / 为什么”时，老师先出一道小题或直接用一句话提问来探底，是允许的，不算跑题；只要题目贴合当前问题、难度不超前。
+- 需要学生作答的检查，优先用 generate_check / generate_quiz 工具出卡片（能记录作答）；一句快速追问可以直接用文字问，两者都可以。
+- 只有这些才算问题：题目与当前问题无关、难度明显超出当前进度、前置完全没建立、或连续多轮只问不推进。
+- 不要要求老师“必须先讲完再提问”，也不要因为“没有先解释”而驳回。
 
 【工具】
 - 只有需要核对“考纲要求 / 真题考法 / 知识点原文”时才调用，最多 2 次。
@@ -124,7 +130,10 @@ function parseVerdict(text: string): SupervisionVerdict {
   const match = clean.match(/^REVISE\b[：:]?\s*([\s\S]+)$/i);
   if (match) {
     const body = match[1].trim();
-    if (body) return { verdict: "revise", critique: `REVISE\n${body}` };
+    // A truncated or shapeless review (模型被 max_tokens 截断很常见) must not
+    // send the teacher a half sentence; fail open instead.
+    const shaped = /问题[：:]/.test(body) && /要求[：:]/.test(body);
+    if (body.length >= 24 && shaped) return { verdict: "revise", critique: `REVISE\n${body}` };
   }
   // Fail open: an unparseable review must never block the teacher.
   return { verdict: "pass", skipped: true };
@@ -151,7 +160,7 @@ export async function reviewTutorDraft(input: {
         messages,
         SUPERVISOR_TOOLS,
         () => { /* reviewers do not stream */ },
-        { maxTokens: 600, temperature: 0.2, effort: "medium", signal: controller.signal },
+        { maxTokens: 1200, temperature: 0.2, effort: "medium", signal: controller.signal },
       );
       if (!result.toolCalls.length) {
         const verdict = parseVerdict(result.text);
