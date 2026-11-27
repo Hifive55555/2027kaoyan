@@ -59,7 +59,10 @@ function toTeacherHistory(history: TutorMessage[]): TeacherHistoryRow[] {
     if (message.actor === "supervisor") {
       // PASS is supervisor bookkeeping; only revision requests reach the teacher.
       if (!message.content.startsWith("REVISE")) return [];
-      return [{ role: "user" as const, content: `【督导】${reviewBody(message.content)}` }];
+      return [{
+        role: "user" as const,
+        content: `【督导】${reviewBody(message.content)}\n\n（上一版回答已撤回，不会发给学生。请直接回答学生最后一条消息，不要回答督导。）`,
+      }];
     }
     return [{
       role: message.role === "tool" ? "tool" as const : message.role === "assistant" ? "assistant" as const : "user" as const,
@@ -69,6 +72,15 @@ function toTeacherHistory(history: TutorMessage[]): TeacherHistoryRow[] {
       name: message.toolName,
     }];
   });
+}
+
+function lastStudentInput(history: TutorMessage[]): string {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const row = history[i];
+    if (row.role !== "user" || row.actor === "supervisor" || row.visible === false) continue;
+    if (row.content.trim()) return row.content;
+  }
+  return "";
 }
 
 async function runTutorTurn(input: {
@@ -245,6 +257,21 @@ function streamTutorReply(input: {
             undefined,
             { actor: "supervisor", replyTo: first.message.id },
           );
+          const retry = lastStudentInput(getTutorHistory(input.userId, input.conversationId));
+          if (retry) {
+            // End the revision prompt with the student's own message again.
+            // Without this the model answers the supervisor, because the last
+            // message it saw was the review. Hidden from the student UI.
+            saveTutorMessage(
+              input.userId,
+              input.conversationId,
+              "user",
+              `（上一版已撤回，请针对下面的问题重答）\n${retry}`,
+              undefined,
+              undefined,
+              { actor: "system", visible: false },
+            );
+          }
           send({
             review: {
               verdict: "revise",

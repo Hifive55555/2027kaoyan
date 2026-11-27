@@ -243,6 +243,8 @@ export interface TutorMessage {
   rejected?: boolean;
   /** Supervisor review -> the draft it reviewed. */
   replyTo?: string;
+  /** false = internal row (retry prompt, tool turn); model sees it, UI does not. */
+  visible?: boolean;
 }
 
 export type TutorSourceType = "bank" | "knowledge" | "syllabus";

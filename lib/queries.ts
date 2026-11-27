@@ -756,6 +756,7 @@ export function getTutorHistory(userId: string, conversationId: string, excludeI
       actor: (row.actor || (row.role === "user" ? "student" : "teacher")) as TutorMessage["actor"],
       rejected: Number(row.rejected) === 1 || undefined,
       replyTo: row.reply_to || undefined,
+      visible: Number(row.visible) === 0 ? false : undefined,
     }];
   });
 }

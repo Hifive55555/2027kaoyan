@@ -112,6 +112,8 @@ export function buildSupervisorMessages(userId: string, history: TutorMessage[])
   };
 
   for (const row of history) {
+    // Retry prompts are teacher-facing bookkeeping, not part of the dialogue.
+    if (row.visible === false && row.role === "user") continue;
     if (row.actor === "supervisor") {
       flush(row.content);
       continue;
