@@ -861,6 +861,7 @@ function toRoadmapItem(row: Row): TutorRoadmapItem {
     sort: Number(row.sort) || 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    manual: Number(row.manual) === 1,
   };
 }
 
@@ -902,7 +903,8 @@ export function getTutorRoadmapText(userId: string, conversationId: string): str
   const status = { pending: "待学", in_progress: "进行中", done: "已完成" };
   const lines = ordered.slice(0, 40).map(item => {
     const pad = "  ".repeat(depth.get(item.id) || 0);
-    return `${pad}- [${status[item.status]}] ${item.title}  (id: ${item.id})`;
+    const mark = item.manual ? "（学生手动标记，未经验证）" : "";
+    return `${pad}- [${status[item.status]}] ${item.title}${mark}  (id: ${item.id})`;
   });
   const current = ordered.find(item => item.status === "in_progress")
     || ordered.find(item => item.status === "pending");
@@ -1027,7 +1029,7 @@ export function syncTutorRoadmapForReply(userId: string, conversationId: string,
   const now = nowIso();
   for (const [id, status] of updates) {
     db.prepare(
-      `UPDATE tutor_roadmap SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`
+      `UPDATE tutor_roadmap SET status = ?, manual = 0, updated_at = ? WHERE id = ? AND user_id = ?`
     ).run(status, now, id, userId);
   }
   return getTutorRoadmap(userId, conversationId);
@@ -1072,7 +1074,7 @@ export function applyTutorRoadmapOps(userId: string, conversationId: string, ops
   }
   for (const update of (ops.update || []).slice(0, 12)) {
     if (!existing.has(update.id) || !ROADMAP_STATUS.has(update.status)) continue;
-    db.prepare(`UPDATE tutor_roadmap SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
+    db.prepare(`UPDATE tutor_roadmap SET status = ?, manual = 0, updated_at = ? WHERE id = ? AND user_id = ?`)
       .run(update.status, now, update.id, userId);
   }
   return getTutorRoadmap(userId, conversationId);
@@ -1082,7 +1084,7 @@ export function setTutorRoadmapStatus(userId: string, id: string, status: "pendi
   if (!ROADMAP_STATUS.has(status)) return null;
   const row = getDb().prepare(`SELECT id, conversation_id FROM tutor_roadmap WHERE id = ? AND user_id = ?`).get(id, userId) as Row | undefined;
   if (!row) return null;
-  getDb().prepare(`UPDATE tutor_roadmap SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
+  getDb().prepare(`UPDATE tutor_roadmap SET status = ?, manual = 1, updated_at = ? WHERE id = ? AND user_id = ?`)
     .run(status, nowIso(), id, userId);
   return getTutorRoadmap(userId, row.conversation_id || "");
 }

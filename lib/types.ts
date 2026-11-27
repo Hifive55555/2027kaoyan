@@ -262,6 +262,8 @@ export interface TutorRoadmapItem {
   sort: number;
   createdAt: string;
   updatedAt: string;
+  /** The student changed this status by hand, not the teacher. */
+  manual?: boolean;
 }
 
 export interface TutorConversationPublic {

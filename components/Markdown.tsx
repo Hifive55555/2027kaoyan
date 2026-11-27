@@ -25,8 +25,13 @@ function normalizeMath(input: string): string {
 }
 
 export function Markdown({
-  children, className, onCitation,
-}: { children: string; className?: string; onCitation?: (ref: string) => void }) {
+  children, className, renderCitation,
+}: {
+  children: string;
+  className?: string;
+  /** Replace a #cite- link with an interactive marker (chip, hover card, ...) */
+  renderCitation?: (ref: string, label: React.ReactNode) => React.ReactNode;
+}) {
   return (
     <div className={cn("md-body", className)}>
       <ReactMarkdown
@@ -37,17 +42,8 @@ export function Markdown({
             // Citation markers are rendered as `[1](#cite-S1)` by the tutor.
             if (href?.startsWith("#cite-")) {
               const ref = href.slice("#cite-".length);
-              if (!onCitation) return <span className="text-[0.75em] text-brand/70">[{children}]</span>;
-              return (
-                <button
-                  type="button"
-                  onClick={() => onCitation(ref)}
-                  aria-label={`查看引用 ${children}`}
-                  className="mx-0.5 inline-flex h-[15px] min-w-[15px] -translate-y-1 items-center justify-center rounded-[4px] border border-brand/25 bg-brand-soft/60 px-1 align-baseline text-[9.5px] font-medium leading-none text-brand transition-colors hover:border-brand/50 hover:bg-brand-soft"
-                >
-                  {children}
-                </button>
-              );
+              if (renderCitation) return <>{renderCitation(ref, children)}</>;
+              return <span className="text-[0.75em] text-brand/70">[{children}]</span>;
             }
             return (
               <a href={href} target="_blank" rel="noreferrer" className="text-brand underline decoration-brand/30 underline-offset-4">

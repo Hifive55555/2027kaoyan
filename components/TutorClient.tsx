@@ -13,6 +13,7 @@ import { TutorCheckCard } from "./TutorCheckCard";
 import { TutorRoadmap } from "./TutorRoadmap";
 import { TutorConversationModal } from "./TutorConversationModal";
 import { TutorSources } from "./TutorSources";
+import { TutorCitation } from "./TutorCitation";
 import { TutorSourceModal } from "./TutorSourceModal";
 
 function pct(n: number) {
@@ -125,6 +126,16 @@ export function TutorClient({
     const timer = setTimeout(() => setSlowTurn(true), 4000);
     return () => clearTimeout(timer);
   }, [loading]);
+
+  // Grow the composer with its content instead of clipping long questions.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const max = 200;
+    el.style.height = `${Math.min(el.scrollHeight, max)}px`;
+    el.style.overflowY = el.scrollHeight > el.clientHeight ? "auto" : "hidden";
+  }, [input]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -326,8 +337,6 @@ export function TutorClient({
     await runTutorStream({ eventQuizId: quiz.id, conversationId: conversation.id });
   }
 
-  const streamMessage = streamingId ? messages.find(m => m.id === streamingId) : undefined;
-  const streamHasText = !!streamMessage?.content;
   const statusKey = turnStatus?.phase || "thinking";
   const countsText = statusCounts(turnStatus?.counts);
   const showCounts = slowTurn && statusKey === "searching" && !!countsText;
@@ -418,7 +427,7 @@ export function TutorClient({
 
       <div className="mt-2 grid min-h-0 flex-1 gap-5 lg:mt-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <section className="-mx-3 flex h-full min-h-0 flex-col overflow-hidden border-0 bg-surface lg:mx-0 lg:rounded-2xl lg:border lg:border-line lg:shadow-[0_1px_2px_rgba(31,29,25,0.04)]">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3.5 py-3.5 sm:px-6 sm:py-5">
+          <div ref={scrollRef} data-chat-scroll className="flex-1 overflow-y-auto px-3.5 py-3.5 sm:px-6 sm:py-5">
             {messages.length === 0 && !loading ? (
               <div className="mx-auto flex min-h-full max-w-xl flex-col items-center justify-center py-5 text-center sm:py-10">
                 <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand sm:h-12 sm:w-12 sm:rounded-2xl"><Sparkles className="h-5 w-5" /></span>
@@ -478,13 +487,20 @@ export function TutorClient({
                             )}
                             {message.content ? (
                               <Markdown
-                                onCitation={ref => {
+                                renderCitation={(ref, label) => {
                                   const source = sourceByRef.get(ref);
-                                  if (source) setActiveSource(source);
+                                  if (!source) return <span>{label}</span>;
+                                  return <TutorCitation source={source} label={label} onOpen={() => setActiveSource(source)} />;
                                 }}
                               >
                                 {withCitationLinks(visibleTutorText(message.content), messageSources)}
                               </Markdown>
+                            ) : message.id === streamingId ? (
+                              <div className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand-soft/40 px-3 py-1.5 text-[10px] text-brand">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span>{STATUS_TEXT[statusKey] || STATUS_TEXT.thinking}…</span>
+                                {showCounts && <span className="text-brand/60">（{countsText}）</span>}
+                              </div>
                             ) : null}
                             {message.quiz && (
                               <TutorQuizCard
@@ -517,15 +533,6 @@ export function TutorClient({
                     </div>
                   );
                 })}
-                {loading && !streamHasText && !error && (
-                  <div className="flex justify-start">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand-soft/40 px-3 py-1.5 text-[10px] text-brand">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      <span>{STATUS_TEXT[statusKey] || STATUS_TEXT.thinking}…</span>
-                      {showCounts && <span className="text-brand/60">（{countsText}）</span>}
-                    </div>
-                  </div>
-                )}
                 {error && (
                   <div className="flex items-start gap-2 rounded-xl border border-accent/20 bg-accent-soft px-3 py-2 text-[11px] leading-5 text-accent">
                     <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
@@ -550,10 +557,10 @@ export function TutorClient({
                 onKeyDown={e => {
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
                 }}
-                rows={2}
+                rows={1}
                 disabled={!!conversation.archivedAt}
                 placeholder={conversation.archivedAt ? "对话已归档，请先取消归档" : "写出你的疑问，越具体越好…"}
-                className="max-h-32 min-h-[42px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[12px] leading-5 outline-none placeholder:text-faint"
+                className="max-h-[min(200px,32dvh)] min-h-[44px] flex-1 resize-none bg-transparent px-2 py-2 text-[13.5px] leading-6 outline-none placeholder:text-faint"
               />
               <button
                 onClick={() => send()}

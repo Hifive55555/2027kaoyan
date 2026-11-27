@@ -46,6 +46,9 @@ function RoadmapNode({
           {item.title}
           {inProgress && <span className="ml-1 text-[8px] text-amber">进行中</span>}
         </span>
+        {item.manual && (
+          <span className="mt-0.5 shrink-0 rounded bg-subtle px-1 py-0.5 text-[8px] leading-none text-faint">你标记</span>
+        )}
       </button>
       {(children.get(item.id) || []).map(child => (
         <RoadmapNode key={child.id} item={child} children={children} depth={depth + 1} busyId={busyId} onToggle={onToggle} />
@@ -82,7 +85,7 @@ export function TutorRoadmap({
           ))}
         </div>
       )}
-      <p className="mt-2 text-[9px] leading-4 text-faint">点一下可标记完成；老师会根据完成情况调整下一步。</p>
+      <p className="mt-2 text-[9px] leading-4 text-faint">点一下可标记完成；老师会看到你的标记，并先用一个小问题确认，再决定是否跳过。</p>
     </div>
   );
 }
