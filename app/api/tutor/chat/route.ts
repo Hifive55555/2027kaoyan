@@ -227,7 +227,6 @@ function streamTutorReply(input: {
 
         // The first draft is already on screen. Review it once; a rejected
         // draft is replaced by one revised answer, which is not reviewed again.
-        send({ status: { phase: "reviewing" } });
         const verdict = await reviewTutorDraft({
           userId: input.userId,
           conversationId: input.conversationId,

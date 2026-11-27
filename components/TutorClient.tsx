@@ -31,7 +31,6 @@ const STATUS_TEXT: Record<string, string> = {
   quiz: "老师正在出题",
   checking: "老师正在准备检查题",
   writing: "老师正在组织语言",
-  reviewing: "督导正在复核",
   revising: "老师正在按督导意见重写",
 };
 
@@ -572,14 +571,6 @@ export function TutorClient({
                     </div>
                   );
                 })}
-                {loading && statusKey === "reviewing" && (
-                  <div className="flex justify-start">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-[10px] text-muted">
-                      <Loader2 className="h-3 w-3 animate-spin text-brand" />
-                      督导正在复核…
-                    </div>
-                  </div>
-                )}
                 {error && (
                   <div className="flex items-start gap-2 rounded-xl border border-accent/20 bg-accent-soft px-3 py-2 text-[11px] leading-5 text-accent">
                     <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
