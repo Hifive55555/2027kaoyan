@@ -3,6 +3,7 @@ import { requireUserApi } from "@/lib/auth";
 import { streamChatWithTools, type ChatMessageInput } from "@/lib/deepseek";
 import { buildTutorMessages } from "@/lib/prompts";
 import { TUTOR_TOOLS, executeTutorTool } from "@/lib/tutor-tools";
+import { createTutorSourceCollector, finalizeCitations, stripUnknownCitations } from "@/lib/tutor-sources";
 import { limitTutorReply } from "@/lib/tutor";
 import { generateTutorConversationTitle } from "@/lib/tutor-title";
 import {
@@ -33,6 +34,15 @@ function parseArgs(raw: string): Record<string, unknown> {
   }
 }
 
+/** Which status line the client shows while a tool runs. */
+const TOOL_PHASE: Record<string, "searching" | "quiz" | "checking"> = {
+  search_question_bank: "searching",
+  search_knowledge: "searching",
+  get_syllabus: "searching",
+  generate_quiz: "quiz",
+  generate_check: "checking",
+};
+
 function streamTutorReply(input: {
   userId: string;
   conversationId: string;
@@ -53,6 +63,7 @@ function streamTutorReply(input: {
       let full = "";
       let quizId: string | undefined;
       let checkId: string | undefined;
+      const sourceCollector = createTutorSourceCollector();
       let messages: ChatMessageInput[] = buildTutorMessages({
         history: input.history.filter(m => m.role !== "system").map(m => ({
           role: m.role === "tool" ? "tool" : m.role === "assistant" ? "assistant" : "user",
@@ -97,16 +108,21 @@ function streamTutorReply(input: {
           for (const call of round.toolCalls) {
             const name = call.function?.name || "";
             const args = parseArgs(call.function?.arguments || "{}");
-            send({ tool: { phase: "calling", name } });
+            const phase = TOOL_PHASE[name];
+            if (phase) send({ status: { phase } });
             let toolResult: Awaited<ReturnType<typeof executeTutorTool>>;
             try {
               toolResult = await executeTutorTool(name, args, {
                 userId: input.userId,
                 conversationId: input.conversationId,
+                sources: sourceCollector,
               });
             } catch (err) {
               toolResult = { result: { error: err instanceof Error ? err.message : "工具执行失败" } };
             }
+            const found = sourceCollector.list();
+            if (found.length) send({ sources: found });
+            if (phase === "searching") send({ status: { phase, counts: sourceCollector.counts() } });
             if (toolResult.quizId) {
               quizId = toolResult.quizId;
               terminal = true;
@@ -131,16 +147,18 @@ function streamTutorReply(input: {
               name,
               content,
             });
-            send({ tool: { phase: "done", name } });
           }
 
           // A generated card is a turn-ending action: the student must answer
           // before the teacher continues. Without this boundary the model
           // writes post-tool commentary that renders above the card.
           if (terminal) break;
+          send({ status: { phase: "writing" } });
         }
 
-        const reply = limitTutorReply(full.trim()) || (!quizId && !checkId ? input.fallback : "");
+        const rawReply = limitTutorReply(full.trim()) || (!quizId && !checkId ? input.fallback : "");
+        const cited = finalizeCitations(rawReply, sourceCollector.list());
+        const reply = stripUnknownCitations(rawReply, cited.sources);
         const assistant = saveTutorMessage(
           input.userId,
           input.conversationId,
@@ -148,6 +166,9 @@ function streamTutorReply(input: {
           reply,
           quizId,
           checkId,
+          cited.sources.length
+            ? { citations: { list: cited.sources, uncited: cited.uncited } }
+            : {},
         );
         let conversationTitle = getTutorConversation(input.userId, input.conversationId)?.title || "新的对话";
         if (input.firstTurn) {
@@ -174,6 +195,8 @@ function streamTutorReply(input: {
             ...assistant,
             quiz: quizId ? getTutorQuiz(quizId, input.userId) || undefined : undefined,
             check: checkId ? getTutorCheck(checkId, input.userId) || undefined : undefined,
+            sources: cited.sources.length ? cited.sources : undefined,
+            uncitedSources: cited.uncited || undefined,
           },
           roadmap: getTutorRoadmap(input.userId, input.conversationId),
           conversationId: input.conversationId,

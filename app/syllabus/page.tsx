@@ -26,7 +26,7 @@ export default function SyllabusPage() {
 
         <div className="mt-7 space-y-4">
           {SUBJECTS.map(s => (
-            <Card key={s.id} className="overflow-hidden">
+            <Card key={s.id} id={s.id} className="scroll-mt-24 overflow-hidden">
               <div className="flex items-start gap-3 p-5">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={subjectTint(s.accent)}>
                   <SubjectIcon id={s.id} />

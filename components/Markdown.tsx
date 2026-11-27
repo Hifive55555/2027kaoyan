@@ -24,18 +24,37 @@ function normalizeMath(input: string): string {
     .join("");
 }
 
-export function Markdown({ children, className }: { children: string; className?: string }) {
+export function Markdown({
+  children, className, onCitation,
+}: { children: string; className?: string; onCitation?: (ref: string) => void }) {
   return (
     <div className={cn("md-body", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkCjkFriendly, [remarkGfm, { singleTilde: false }], remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noreferrer" className="text-brand underline decoration-brand/30 underline-offset-4">
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) => {
+            // Citation markers are rendered as `[1](#cite-S1)` by the tutor.
+            if (href?.startsWith("#cite-")) {
+              const ref = href.slice("#cite-".length);
+              if (!onCitation) return <span className="text-[0.75em] text-brand/70">[{children}]</span>;
+              return (
+                <button
+                  type="button"
+                  onClick={() => onCitation(ref)}
+                  aria-label={`查看引用 ${children}`}
+                  className="mx-0.5 inline-flex h-[15px] min-w-[15px] -translate-y-1 items-center justify-center rounded-[4px] border border-brand/25 bg-brand-soft/60 px-1 align-baseline text-[9.5px] font-medium leading-none text-brand transition-colors hover:border-brand/50 hover:bg-brand-soft"
+                >
+                  {children}
+                </button>
+              );
+            }
+            return (
+              <a href={href} target="_blank" rel="noreferrer" className="text-brand underline decoration-brand/30 underline-offset-4">
+                {children}
+              </a>
+            );
+          },
           img: ({ src, alt }) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={typeof src === "string" ? src : ""} alt={alt || "题图"} className="my-3 max-h-80 rounded-lg border border-line bg-surface object-contain" />

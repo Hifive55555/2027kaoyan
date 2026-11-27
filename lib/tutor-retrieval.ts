@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getTutorRoadmap } from "./queries";
-import { knowledgeExcerpt } from "./knowledge";
+import { expandKnowledgeQuery, knowledgeSnippet, searchKnowledge } from "./knowledge";
+import { corpusMeta } from "./corpus";
+import type { TutorSourceCollector } from "./tutor-sources";
 import type { SubjectId } from "./types";
 
 type BankQuestion = {
@@ -92,10 +94,10 @@ function scoreQuestion(q: BankQuestion, terms: string[]): number {
   return score;
 }
 
-function syllabusExcerpts(terms: string[]): string[] {
+function syllabusHits(terms: string[]): { subject: string; label: string; line: string }[] {
   const dir = path.join(process.cwd(), "data/syllabus");
   if (!fs.existsSync(dir)) return [];
-  const out: string[] = [];
+  const out: { subject: string; label: string; line: string }[] = [];
   for (const file of fs.readdirSync(dir).filter(f => f.endsWith("-2027.md"))) {
     const text = fs.readFileSync(path.join(dir, file), "utf8");
     const lines = text.split("\n");
@@ -105,9 +107,47 @@ function syllabusExcerpts(terms: string[]): string[] {
       const score = terms.reduce((n, term) => n + (line.includes(term) ? 1 : 0), 0);
       if (score > best.score) best = { score, line: line.trim() };
     }
-    if (best.score > 0) out.push(`${file.replace("-2027.md", "")}：${compact(best.line, 180)}`);
+    // A single generic word (e.g. “方式” in “答题方式”) is not a real hit.
+    if (best.score > 1) {
+      const subject = file.replace("-2027.md", "");
+      out.push({ subject, label: SUBJECT_LABEL[subject] || subject, line: compact(best.line, 180) });
+    }
   }
-  return out.slice(0, 3);
+  return out.slice(0, 2);
+}
+
+function bankUrl(q: BankQuestion): string {
+  const subject = q.subject as SubjectId;
+  try {
+    if (q.year && corpusMeta(subject).years.includes(q.year)) return `/corpus/${subject}/${q.year}`;
+  } catch { /* fall back to the subject index */ }
+  return `/corpus/${subject}`;
+}
+
+function bankDetail(q: BankQuestion): string {
+  return (q.options || []).map(o => `${o.key}. ${compact(o.text, 160)}`).join("\n");
+}
+
+function knowledgeLines(
+  query: string,
+  subject: string | undefined,
+  limit: number,
+  sources: TutorSourceCollector,
+): string {
+  const expanded = expandKnowledgeQuery(query);
+  const hits = searchKnowledge(expanded, { subject, limit });
+  return hits.map(entry => {
+    const ref = sources.add({
+      key: `knowledge:${entry.id}`,
+      type: "knowledge",
+      title: entry.title,
+      meta: `${SUBJECT_LABEL[entry.subject] || entry.subject} · ${entry.chapter || "综合"}`,
+      excerpt: knowledgeSnippet(entry.text, query, 360),
+      detail: entry.text.slice(0, 1800),
+      url: `/knowledge/${encodeURIComponent(entry.id)}`,
+    });
+    return `- [[${ref}]] [${entry.chapter}] ${entry.title}（${entry.source}）\n${knowledgeSnippet(entry.text, query, 900)}`;
+  }).join("\n\n");
 }
 
 function roadmapTerms(userId: string, conversationId: string): string[] {
@@ -117,7 +157,12 @@ function roadmapTerms(userId: string, conversationId: string): string[] {
   return [...active, ...pending].map(i => i.title);
 }
 
-export function getTutorRetrievalContext(userId: string, conversationId: string, message: string): string {
+export function getTutorRetrievalContext(
+  userId: string,
+  conversationId: string,
+  message: string,
+  sources: TutorSourceCollector,
+): string {
   const query = [message, ...roadmapTerms(userId, conversationId)].join(" ");
   const terms = termsOf(query);
   if (!terms.length) return "";
@@ -131,20 +176,40 @@ export function getTutorRetrievalContext(userId: string, conversationId: string,
   all.sort((a, b) => b.score - a.score || b.q.year - a.q.year);
   const hits = all.slice(0, 60);
   if (!hits.length) {
-    const knowledge = knowledgeExcerpt(undefined, query, 3, 620);
+    const knowledge = knowledgeLines(query, undefined, 3, sources);
     return `【本地题库检索】未找到明确匹配的历年题。不要据此断言“没有考过”；可提示用户换关键词或联网搜索。${knowledge ? `\n【本地知识点检索（自动）】\n${knowledge}` : ""}`;
   }
   const byYear = new Map<number, number>();
   for (const h of hits) byYear.set(h.q.year, (byYear.get(h.q.year) || 0) + 1);
   const years = [...byYear.entries()].sort((a, b) => b[0] - a[0]).slice(0, 15)
     .map(([y, n]) => `${y}(${n})`).join("、");
-  const samples = hits.slice(0, 8).map(({ q }) => {
+  const samples = hits.slice(0, 4).map(({ q }) => {
     const ans = compact(q.answer, 40);
+    const ref = sources.add({
+      key: `bank:${q.id}`,
+      type: "bank",
+      title: q.year ? `${q.year} 年第 ${q.number} 题` : `扩展题第 ${q.number} 题`,
+      meta: `${SUBJECT_LABEL[q.subject] || q.subject} · ${q.chapter || "未分类"}`,
+      excerpt: compact(q.stem, 160),
+      detail: bankDetail(q),
+      url: bankUrl(q),
+    });
     const label = q.year ? `${q.year} 年第 ${q.number} 题` : `扩展题第 ${q.number} 题`;
-    return `- ${label} [${SUBJECT_LABEL[q.subject] || q.subject}·${q.chapter || ""}] ${compact(q.stem, 120)}${ans ? `（答案：${ans}）` : ""}`;
+    return `- [[${ref}]] ${label} [${SUBJECT_LABEL[q.subject] || q.subject}·${q.chapter || ""}] ${compact(q.stem, 120)}${ans ? `（答案：${ans}）` : ""}`;
   }).join("\n");
-  const syllabus = syllabusExcerpts(terms);
-  const knowledge = knowledgeExcerpt(undefined, query, 3, 620);
+  const syllabus = syllabusHits(terms).map(hit => {
+    const ref = sources.add({
+      key: `syllabus:${hit.subject}:${hit.line}`,
+      type: "syllabus",
+      title: `${hit.label} 2027 大纲`,
+      meta: "2027 考试大纲",
+      excerpt: hit.line,
+      detail: hit.line,
+      url: `/syllabus#${hit.subject}`,
+    });
+    return `- [[${ref}]] ${hit.label}：${hit.line}`;
+  });
+  const knowledge = knowledgeLines(query, undefined, 3, sources);
   return `【本地题库检索（自动）】
 匹配 ${all.length} 道；年份分布：${years || "无"}。
 代表题：

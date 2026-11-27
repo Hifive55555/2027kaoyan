@@ -5,24 +5,75 @@ import {
   AlertCircle, BookOpen, CheckCircle2, ChevronDown, GraduationCap, Loader2, MessageCircle,
   Plus, Route, Send, Sparkles, Target, X,
 } from "lucide-react";
-import type { LearnerProfile, TutorCheckPublic, TutorConversationPublic, TutorMessage, TutorQuizPublic, TutorRoadmapItem } from "@/lib/types";
+import type { LearnerProfile, TutorCheckPublic, TutorConversationPublic, TutorMessage, TutorQuizPublic, TutorRoadmapItem, TutorSource } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Markdown } from "./Markdown";
 import { TutorQuizCard } from "./TutorQuizCard";
 import { TutorCheckCard } from "./TutorCheckCard";
 import { TutorRoadmap } from "./TutorRoadmap";
 import { TutorConversationModal } from "./TutorConversationModal";
+import { TutorSources } from "./TutorSources";
+import { TutorSourceModal } from "./TutorSourceModal";
 
 function pct(n: number) {
   return `${Math.round(n)}%`;
 }
 
+const TYPE_LABEL: Record<string, string> = { bank: "题库", knowledge: "知识点", syllabus: "大纲" };
+
+type TurnStatus = { phase?: string; counts?: Partial<Record<string, number>> };
+
+const STATUS_TEXT: Record<string, string> = {
+  thinking: "老师正在想",
+  searching: "老师正在查资料",
+  quiz: "老师正在出题",
+  checking: "老师正在准备检查题",
+  writing: "老师正在组织语言",
+};
+
+function statusCounts(counts?: Partial<Record<string, number>>) {
+  if (!counts) return "";
+  return Object.entries(counts)
+    .filter(([, count]) => count)
+    .map(([type, count]) => `${TYPE_LABEL[type] || type} ${count}`)
+    .join(" · ");
+}
+
 function visibleTutorText(text: string) {
   const marker = text.search(/\[\[(CHECK|QUIZ|ROADMAP)\]/i);
   if (marker >= 0) return text.slice(0, marker).trimEnd();
-  const partial = text.lastIndexOf("[[");
-  if (partial >= 0 && text.length - partial < 16) return text.slice(0, partial).trimEnd();
+  // Hide a marker that is still streaming in, e.g. "[[S" or "[[S1" before "]]".
+  const partial = text.match(/\[\[[A-Z0-9]{0,10}$/i);
+  if (partial?.index !== undefined) return text.slice(0, partial.index).trimEnd();
   return text;
+}
+
+/** Number live sources by first citation so streamed numbers match the final ones. */
+function orderSourcesByCitation(text: string, sources: TutorSource[]) {
+  if (!sources.length) return sources;
+  const known = new Set(sources.map(source => source.ref));
+  const cited: string[] = [];
+  for (const match of text.matchAll(/\[\[(S\d+)\]\]/g)) {
+    const ref = match[1];
+    if (known.has(ref) && !cited.includes(ref)) cited.push(ref);
+  }
+  if (!cited.length) return sources;
+  const byRef = new Map(sources.map(source => [source.ref, source]));
+  return [
+    ...cited.map(ref => byRef.get(ref)!),
+    ...sources.filter(source => !cited.includes(source.ref)),
+  ];
+}
+
+/** Turn [[S1]] markers into clickable superscript links before Markdown runs. */
+function withCitationLinks(text: string, sources: TutorSource[]) {
+  if (!sources.length) return text.replace(/\[\[S\d+\]\]/g, "");
+  const numbers = new Map<string, number>();
+  sources.forEach((source, index) => numbers.set(source.ref, source.num ?? index + 1));
+  return text.replace(/\[\[(S\d+)\]\]/g, (_marker, ref: string) => {
+    const num = numbers.get(ref);
+    return num ? `[${num}](#cite-${ref})` : "";
+  });
 }
 
 function subjectName(id: string) {
@@ -48,7 +99,10 @@ export function TutorClient({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
-  const [toolStatus, setToolStatus] = useState<string>("");
+  const [turnStatus, setTurnStatus] = useState<TurnStatus | null>(null);
+  const [liveSources, setLiveSources] = useState<TutorSource[]>([]);
+  const [slowTurn, setSlowTurn] = useState(false);
+  const [activeSource, setActiveSource] = useState<TutorSource | null>(null);
   const [savingGoal, setSavingGoal] = useState(false);
   const [error, setError] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
@@ -64,7 +118,13 @@ export function TutorClient({
       return;
     }
     el.scrollTop = el.scrollHeight;
-  }, [messages, loading]);
+  }, [messages, loading, liveSources, turnStatus]);
+
+  useEffect(() => {
+    if (!loading) { setSlowTurn(false); return; }
+    const timer = setTimeout(() => setSlowTurn(true), 4000);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -121,7 +181,24 @@ export function TutorClient({
     setStreamingId(tempId);
     setLoading(true);
     setError("");
+    setTurnStatus({ phase: "thinking" });
+    setLiveSources([]);
     let done = false;
+    // Keep "查资料" on screen long enough to read: local lookups finish in a
+    // few milliseconds, so without a floor the status would never paint.
+    let searchingSince = 0;
+    let statusTimer: ReturnType<typeof setTimeout> | null = null;
+    const applyStatus = (next: TurnStatus) => {
+      if (statusTimer) { clearTimeout(statusTimer); statusTimer = null; }
+      const now = Date.now();
+      if (next.phase === "searching") searchingSince = now;
+      const hold = next.phase === "writing" && searchingSince ? searchingSince + 800 - now : 0;
+      if (hold > 0) {
+        statusTimer = setTimeout(() => { statusTimer = null; setTurnStatus(next); }, hold);
+        return;
+      }
+      setTurnStatus(next);
+    };
     try {
       const res = await fetch("/api/tutor/chat", {
         method: "POST",
@@ -150,14 +227,11 @@ export function TutorClient({
           let data: any;
           try { data = JSON.parse(payload); } catch { continue; }
           if (data.error) throw new Error(data.error);
-          if (data.tool) {
-            const names: Record<string, string> = {
-              search_question_bank: "检索题库", search_knowledge: "查知识点", get_learner_profile: "查学习档案",
-              get_learning_roadmap: "查学习路线", update_learning_roadmap: "更新学习路线",
-              generate_quiz: "出题", generate_check: "生成检查题", get_syllabus: "查大纲",
-            };
-            if (data.tool.phase === "calling") setToolStatus(names[data.tool.name] || "调用工具");
-            else setToolStatus("");
+          if (data.status) {
+            applyStatus({ phase: String(data.status.phase || "thinking"), counts: data.status.counts });
+          }
+          if (Array.isArray(data.sources)) {
+            setLiveSources(data.sources as TutorSource[]);
           }
           if (data.delta) {
             acc += data.delta;
@@ -166,7 +240,9 @@ export function TutorClient({
           }
           if (data.done) {
             done = true;
-            setToolStatus("");
+            if (statusTimer) { clearTimeout(statusTimer); statusTimer = null; }
+            setTurnStatus(null);
+            setLiveSources([]);
             setMessages(prev => [
               ...prev.filter(m => m.id !== tempId),
               data.message,
@@ -185,9 +261,11 @@ export function TutorClient({
       if (opts.restoreInput) setInput(opts.restoreInput);
       setError(err instanceof Error ? err.message : "老师暂时没回答上来");
     } finally {
+      if (statusTimer) clearTimeout(statusTimer);
       setStreamingId(null);
       setLoading(false);
-      setToolStatus("");
+      setTurnStatus(null);
+      setLiveSources([]);
     }
   }
 
@@ -247,6 +325,12 @@ export function TutorClient({
   async function followUpOnQuiz(quiz: TutorQuizPublic) {
     await runTutorStream({ eventQuizId: quiz.id, conversationId: conversation.id });
   }
+
+  const streamMessage = streamingId ? messages.find(m => m.id === streamingId) : undefined;
+  const streamHasText = !!streamMessage?.content;
+  const statusKey = turnStatus?.phase || "thinking";
+  const countsText = statusCounts(turnStatus?.counts);
+  const showCounts = slowTurn && statusKey === "searching" && !!countsText;
 
   return (
     <div className="-mb-24 flex h-[calc(100dvh-3.5rem)] flex-col px-3 pb-[calc(3.75rem+env(safe-area-inset-bottom))] pt-2 lg:mx-auto lg:mb-0 lg:h-dvh lg:max-h-dvh lg:max-w-[1180px] lg:overflow-hidden lg:px-9 lg:py-6">
@@ -356,70 +440,89 @@ export function TutorClient({
               </div>
             ) : (
               <div className="mx-auto max-w-2xl space-y-4">
-                {messages.map(message => message.role === "system" ? (
-                  <div key={message.id} className="flex justify-center py-0.5">
-                    <span className={cn(
-                      "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[9px]",
-                      /答错|与预期不同/.test(message.content) ? "border-accent/20 bg-accent-soft text-accent" : "border-line bg-surface-2 text-muted"
-                    )}>
-                      {/答错|与预期不同/.test(message.content)
-                        ? <AlertCircle className="h-3 w-3" />
-                        : <CheckCircle2 className="h-3 w-3 text-brand" />}
-                      {message.content}
-                    </span>
-                  </div>
-                ) : (
-                  <div key={message.id} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
-                    <div className={cn(
-                      "text-[13px] leading-6",
-                      message.role === "user"
-                        ? "max-w-[92%] break-words rounded-2xl rounded-br-md bg-ink px-3.5 py-2.5 text-paper"
-                        : "w-full max-w-none py-1 text-ink"
-                    )}>
-                      {message.role === "assistant" ? (
-                        <>
-                          {(message.content || (!message.quiz && !message.check)) && (
-                            <div className="mb-1 flex items-center gap-1.5 text-[9px] uppercase tracking-[0.12em] text-muted">
-                              <Sparkles className="h-3 w-3 text-brand" /> 老师
-                            </div>
-                          )}
-                          {message.content ? <Markdown>{visibleTutorText(message.content)}</Markdown> : message.id === streamingId ? (
-                            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted"><Loader2 className="h-3 w-3 animate-spin" /> 老师正在组织语言…</span>
-                          ) : null}
-                          {message.quiz && (
-                            <TutorQuizCard
-                              quiz={message.quiz}
-                              readOnly={!!conversation.archivedAt}
-                              onUpdated={updateQuiz}
-                              onAnswered={(quiz, systemMessage) => { updateQuiz(quiz); if (systemMessage) setMessages(prev => [...prev, systemMessage]); followUpOnQuiz(quiz); }}
-                            />
-                          )}
-                          {message.check && (
-                            <TutorCheckCard
-                              check={message.check}
-                              readOnly={!!conversation.archivedAt}
-                              onUpdated={updateCheck}
-                              onAnswered={(check, systemMessage) => { updateCheck(check); if (systemMessage) setMessages(prev => [...prev, systemMessage]); followUpOnCheck(check); }}
-                            />
-                          )}
-                        </>
-                      ) : (
-                        <span className="whitespace-pre-wrap">{message.content}</span>
-                      )}
+                {messages.map(message => {
+                  const ordered = message.id === streamingId
+                    ? orderSourcesByCitation(message.content, liveSources)
+                    : (message.sources || []);
+                  const messageSources = ordered.map((source, index) => source.num ? source : { ...source, num: index + 1 });
+                  const sourceByRef = new Map(messageSources.map(source => [source.ref, source]));
+                  if (message.role === "system") {
+                    return (
+                      <div key={message.id} className="flex justify-center py-0.5">
+                        <span className={cn(
+                          "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[9px]",
+                          /答错|与预期不同/.test(message.content) ? "border-accent/20 bg-accent-soft text-accent" : "border-line bg-surface-2 text-muted"
+                        )}>
+                          {/答错|与预期不同/.test(message.content)
+                            ? <AlertCircle className="h-3 w-3" />
+                            : <CheckCircle2 className="h-3 w-3 text-brand" />}
+                          {message.content}
+                        </span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={message.id} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
+                      <div className={cn(
+                        "text-[13px] leading-6",
+                        message.role === "user"
+                          ? "max-w-[92%] break-words rounded-2xl rounded-br-md bg-ink px-3.5 py-2.5 text-paper"
+                          : "w-full max-w-none py-1 text-ink"
+                      )}>
+                        {message.role === "assistant" ? (
+                          <>
+                            {(message.content || (!message.quiz && !message.check)) && (
+                              <div className="mb-1 flex items-center gap-1.5 text-[9px] uppercase tracking-[0.12em] text-muted">
+                                <Sparkles className="h-3 w-3 text-brand" /> 老师
+                              </div>
+                            )}
+                            {message.content ? (
+                              <Markdown
+                                onCitation={ref => {
+                                  const source = sourceByRef.get(ref);
+                                  if (source) setActiveSource(source);
+                                }}
+                              >
+                                {withCitationLinks(visibleTutorText(message.content), messageSources)}
+                              </Markdown>
+                            ) : null}
+                            {message.quiz && (
+                              <TutorQuizCard
+                                quiz={message.quiz}
+                                readOnly={!!conversation.archivedAt}
+                                onUpdated={updateQuiz}
+                                onAnswered={(quiz, systemMessage) => { updateQuiz(quiz); if (systemMessage) setMessages(prev => [...prev, systemMessage]); followUpOnQuiz(quiz); }}
+                              />
+                            )}
+                            {message.check && (
+                              <TutorCheckCard
+                                check={message.check}
+                                readOnly={!!conversation.archivedAt}
+                                onUpdated={updateCheck}
+                                onAnswered={(check, systemMessage) => { updateCheck(check); if (systemMessage) setMessages(prev => [...prev, systemMessage]); followUpOnCheck(check); }}
+                              />
+                            )}
+                            {message.sources?.length ? (
+                              <TutorSources
+                                sources={message.sources}
+                                uncited={message.uncitedSources}
+                                onOpen={source => setActiveSource(source)}
+                              />
+                            ) : null}
+                          </>
+                        ) : (
+                          <span className="whitespace-pre-wrap">{message.content}</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {toolStatus && (
+                  );
+                })}
+                {loading && !streamHasText && !error && (
                   <div className="flex justify-start">
                     <div className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand-soft/40 px-3 py-1.5 text-[10px] text-brand">
-                      <Loader2 className="h-3 w-3 animate-spin" /> 老师正在{toolStatus}…
-                    </div>
-                  </div>
-                )}
-                {loading && !streamingId && (
-                  <div className="flex justify-start">
-                    <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-line bg-surface-2 px-3.5 py-3 text-[11px] text-muted">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" /> 老师正在想，先不急着一次讲完…
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>{STATUS_TEXT[statusKey] || STATUS_TEXT.thinking}…</span>
+                      {showCounts && <span className="text-brand/60">（{countsText}）</span>}
                     </div>
                   </div>
                 )}
@@ -470,6 +573,8 @@ export function TutorClient({
           <ProfileCard profile={profile} goal={goal} setGoal={setGoal} saveGoal={saveGoal} savingGoal={savingGoal} />
         </aside>
       </div>
+
+      <TutorSourceModal source={activeSource} onClose={() => setActiveSource(null)} />
     </div>
   );
 }

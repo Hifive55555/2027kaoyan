@@ -233,6 +233,25 @@ export interface TutorMessage {
   toolCalls?: { id: string; type?: string; function: { name: string; arguments: string } }[];
   toolCallId?: string;
   toolName?: string;
+  /** Cited sources for this reply, numbered in order of first citation. */
+  sources?: TutorSource[];
+  /** Retrieved sources the reply did not actually cite. */
+  uncitedSources?: number;
+}
+
+export type TutorSourceType = "bank" | "knowledge" | "syllabus";
+
+export interface TutorSource {
+  /** Opaque ref used inside the reply text: [[S1]]. */
+  ref: string;
+  /** Display number once cited (1-based). */
+  num?: number;
+  type: TutorSourceType;
+  title: string;
+  meta: string;
+  excerpt: string;
+  detail?: string;
+  url?: string;
 }
 
 export interface TutorRoadmapItem {

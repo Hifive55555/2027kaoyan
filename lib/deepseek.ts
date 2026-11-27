@@ -198,7 +198,6 @@ export async function streamChatWithTools(
     temperature?: number;
     signal?: AbortSignal;
     effort?: ReasoningEffort;
-    onToolStatus?: (status: { phase: "calling" | "done"; name?: string }) => void;
   } = {},
 ): Promise<ToolStreamResult> {
   const controller = new AbortController();
@@ -268,7 +267,6 @@ export async function streamChatWithTools(
         type: "function" as const,
         function: { name: value.name, arguments: value.arguments || "{}" },
       }));
-    if (toolCalls.length) opts.onToolStatus?.({ phase: "calling", name: toolCalls[0].function.name });
     return { text, toolCalls, annotations };
   } finally {
     clearTimeout(timer);

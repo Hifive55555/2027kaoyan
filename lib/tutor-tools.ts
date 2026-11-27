@@ -3,13 +3,16 @@ import path from "node:path";
 import type { ToolDefinition } from "./deepseek";
 import { applyTutorRoadmapOps, createTutorCheck, getTutorRoadmap, getTutorRoadmapText } from "./queries";
 import { getTutorRetrievalContext } from "./tutor-retrieval";
-import { knowledgeExcerpt } from "./knowledge";
+import { expandKnowledgeQuery, knowledgeSnippet, searchKnowledge } from "./knowledge";
 import { buildLearnerProfile, toLearnerPrompt } from "./learner";
 import { generateTutorQuizDraft } from "./tutor-service";
+import type { TutorSourceCollector } from "./tutor-sources";
 
 export interface TutorToolContext {
   userId: string;
   conversationId: string;
+  /** Collects citable material so the reply can point back at it. */
+  sources: TutorSourceCollector;
 }
 
 export interface TutorToolResult {
@@ -18,6 +21,8 @@ export interface TutorToolResult {
   checkId?: string;
   roadmapUpdated?: boolean;
 }
+
+const SYLLABUS_LABELS: Record<string, string> = { math2: "数学二", english2: "英语二", politics: "政治", cs408: "408" };
 
 const roadmapAdd = {
   type: "object",
@@ -163,14 +168,29 @@ export async function executeTutorTool(
     case "search_question_bank": {
       const query = text(args.query, 500);
       if (!query) throw new Error("query 不能为空");
-      const context = getTutorRetrievalContext(ctx.userId, ctx.conversationId, query);
+      const context = getTutorRetrievalContext(ctx.userId, ctx.conversationId, query, ctx.sources);
       return { result: { context } };
     }
     case "search_knowledge": {
       const query = text(args.query, 500);
       const subject = typeof args.subject === "string" ? args.subject : undefined;
       const limit = Math.max(1, Math.min(8, Number(args.limit) || 3));
-      return { result: { context: knowledgeExcerpt(subject, query, limit, 900) } };
+      const expanded = expandKnowledgeQuery(query);
+      const hits = searchKnowledge(expanded, { subject, limit });
+      if (!hits.length) return { result: { context: "没有找到匹配的知识点原文。" } };
+      const context = hits.map(entry => {
+        const ref = ctx.sources.add({
+          key: `knowledge:${entry.id}`,
+          type: "knowledge",
+          title: entry.title,
+          meta: `${entry.chapter || "综合"} · ${entry.subject}`,
+          excerpt: knowledgeSnippet(entry.text, query, 360),
+          detail: entry.text.slice(0, 1800),
+          url: `/knowledge/${encodeURIComponent(entry.id)}`,
+        });
+        return `- [[${ref}]] [${entry.chapter}] ${entry.title}（${entry.source}）\n${knowledgeSnippet(entry.text, query, 900)}`;
+      }).join("\n\n");
+      return { result: { context } };
     }
     case "get_learner_profile": {
       return { result: { profile: toLearnerPrompt(buildLearnerProfile(ctx.userId)) } };
@@ -188,7 +208,18 @@ export async function executeTutorTool(
         .filter(line => !query || line.toLowerCase().includes(query) || query.split(/\s+/).some(term => line.includes(term)))
         .slice(0, 40)
         .join("\n");
-      return { result: { text: picked || lines.slice(0, 80).join("\n") } };
+      const body = picked || lines.slice(0, 80).join("\n");
+      const label = SYLLABUS_LABELS[subject] || subject;
+      const ref = ctx.sources.add({
+        key: `syllabus:${subject}:${query}`,
+        type: "syllabus",
+        title: `${label} 2027 大纲`,
+        meta: "2027 考试大纲",
+        excerpt: `${query ? `“${query}”相关：` : ""}${body.replace(/\s+/g, " ").slice(0, 220)}`,
+        detail: body.slice(0, 2400),
+        url: `/syllabus#${subject}`,
+      });
+      return { result: { text: `[[${ref}]]\n${body}` } };
     }
     case "update_learning_roadmap": {
       const add = Array.isArray(args.add) ? args.add.slice(0, 20) : [];

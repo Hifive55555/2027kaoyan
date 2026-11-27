@@ -132,12 +132,21 @@ function bestWindow(text: string, query: string, maxChars: number): string {
   return `${bestAt > 0 ? "…" : ""}${text.slice(bestAt, bestAt + maxChars)}${bestAt + maxChars < text.length ? "…" : ""}`;
 }
 
-export function knowledgeExcerpt(subject: string | undefined, query: string, limit = 3, maxChars = 520): string {
+export function expandKnowledgeQuery(query: string): string {
   const expansions: string[] = [];
   if (/空闲空间管理|空闲块管理|文件存储空间/.test(query)) expansions.push("文件存储空间管理 空闲表法 空闲链表法 位示图法 成组链接法");
   if (/链接分配|文件物理结构/.test(query)) expansions.push("隐式链接 显式链接 FAT 簇 索引分配");
   if (/目录结构|目录项/.test(query)) expansions.push("文件控制块 索引节点 FCB inode 单级目录 两级目录 树形目录");
-  const expanded = [query, ...expansions].join(" ");
+  return [query, ...expansions].join(" ");
+}
+
+/** Center a readable excerpt around the query terms; used by citation cards. */
+export function knowledgeSnippet(text: string, query: string, maxChars = 480): string {
+  return bestWindow(text.replace(/\s+/g, " "), expandKnowledgeQuery(query), maxChars);
+}
+
+export function knowledgeExcerpt(subject: string | undefined, query: string, limit = 3, maxChars = 520): string {
+  const expanded = expandKnowledgeQuery(query);
   const hits = searchKnowledge(expanded, { subject, limit });
   return hits.map(e => `- [${e.chapter}] ${e.title}（${e.source}）\n${bestWindow(e.text.replace(/\s+/g, " "), expanded, maxChars)}`).join("\n\n");
 }

@@ -416,6 +416,7 @@ function migrate(db: DatabaseSync) {
   addColumn(db, "tutor_messages", "tool_calls", "TEXT");
   addColumn(db, "tutor_messages", "tool_call_id", "TEXT");
   addColumn(db, "tutor_messages", "tool_name", "TEXT");
+  addColumn(db, "tutor_messages", "sources", "TEXT");
   addColumn(db, "tutor_roadmap", "conversation_id", "TEXT");
   db.exec(`CREATE INDEX IF NOT EXISTS idx_tutor_messages_conversation ON tutor_messages(conversation_id, created_at);`);
   migrateTutorConversations(db);

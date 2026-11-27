@@ -13,6 +13,7 @@ import type {
   TutorMessage,
   TutorQuizPublic,
   TutorRoadmapItem,
+  TutorSource,
 } from "./types";
 
 type Row = Record<string, any>;
@@ -20,6 +21,14 @@ type Row = Record<string, any>;
 function parseJson<T>(s: string | null | undefined, fallback: T): T {
   if (!s) return fallback;
   try { return JSON.parse(s) as T; } catch { return fallback; }
+}
+
+/** Stored as {"list":[...],"uncited":n} in tutor_messages.sources. */
+function parseTutorCitations(raw: string | null | undefined): { sources: TutorSource[]; uncited: number } | null {
+  if (!raw) return null;
+  const data = parseJson<{ list?: TutorSource[]; uncited?: number } | null>(raw, null);
+  if (!data || !Array.isArray(data.list) || !data.list.length) return null;
+  return { sources: data.list, uncited: Number(data.uncited) || 0 };
 }
 
 export interface GeneratedSection {
@@ -663,15 +672,16 @@ export function saveTutorMessage(
   content: string,
   quizId?: string,
   checkId?: string,
-  extras: { toolCalls?: unknown; toolCallId?: string; toolName?: string } = {},
+  extras: { toolCalls?: unknown; toolCallId?: string; toolName?: string; citations?: unknown } = {},
 ): TutorMessage {
   const id = newId("tm");
   const createdAt = nowIso();
   const toolCalls = extras.toolCalls ? JSON.stringify(extras.toolCalls) : null;
+  const citations = extras.citations ? JSON.stringify(extras.citations) : null;
   getDb().prepare(
-    `INSERT INTO tutor_messages (id, user_id, conversation_id, role, content, quiz_id, check_id, tool_calls, tool_call_id, tool_name, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, userId, conversationId, role, content, quizId || null, checkId || null, toolCalls, extras.toolCallId || null, extras.toolName || null, createdAt);
+    `INSERT INTO tutor_messages (id, user_id, conversation_id, role, content, quiz_id, check_id, tool_calls, tool_call_id, tool_name, sources, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, userId, conversationId, role, content, quizId || null, checkId || null, toolCalls, extras.toolCallId || null, extras.toolName || null, citations, createdAt);
   getDb().prepare(`UPDATE tutor_conversations SET updated_at = ? WHERE id = ? AND user_id = ?`)
     .run(createdAt, conversationId, userId);
   return {
@@ -693,14 +703,19 @@ export function getTutorMessages(userId: string, conversationId: string, limit?:
   const rows = (limit
     ? db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? AND role != 'tool' ORDER BY created_at DESC LIMIT ?`).all(userId, conversationId, limit)
     : db.prepare(`SELECT * FROM tutor_messages WHERE user_id = ? AND conversation_id = ? AND role != 'tool' ORDER BY created_at DESC`).all(userId, conversationId)) as Row[];
-  return rows.reverse().filter(row => !(row.role === "assistant" && row.tool_calls && !row.content)).map(row => ({
-    id: row.id,
-    role: row.role === "assistant" ? "assistant" as const : row.role === "system" ? "system" as const : "user" as const,
-    content: row.content,
-    createdAt: row.created_at,
-    quiz: row.quiz_id ? getTutorQuiz(row.quiz_id, userId) || undefined : undefined,
-    check: row.check_id ? getTutorCheck(row.check_id, userId) || undefined : undefined,
-  }));
+  return rows.reverse().filter(row => !(row.role === "assistant" && row.tool_calls && !row.content)).map(row => {
+    const citations = parseTutorCitations(row.sources);
+    return {
+      id: row.id,
+      role: row.role === "assistant" ? "assistant" as const : row.role === "system" ? "system" as const : "user" as const,
+      content: row.content,
+      createdAt: row.created_at,
+      quiz: row.quiz_id ? getTutorQuiz(row.quiz_id, userId) || undefined : undefined,
+      check: row.check_id ? getTutorCheck(row.check_id, userId) || undefined : undefined,
+      sources: citations?.sources,
+      uncitedSources: citations?.uncited,
+    };
+  });
 }
 
 export function getTutorHistory(userId: string, conversationId: string, excludeId?: string): TutorMessage[] {
