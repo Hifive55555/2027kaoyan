@@ -13,6 +13,10 @@ function formatRemaining(ms: number) {
 
 export function PhoneUploadModal({
   open, url, status, error, expiresAt, onClose,
+  title = "手机扫码上传手写答案",
+  description = "用手机拍照，图片会直接传到当前这道题。",
+  uploadedText = "正在填入答题区…",
+  footer = "二维码只对当前账号和本题有效，过期自动失效",
 }: {
   open: boolean;
   url: string;
@@ -20,6 +24,10 @@ export function PhoneUploadModal({
   error?: string;
   expiresAt?: string;
   onClose: () => void;
+  title?: string;
+  description?: string;
+  uploadedText?: string;
+  footer?: string;
 }) {
   const [remaining, setRemaining] = useState(() => expiresAt ? new Date(expiresAt).getTime() - Date.now() : 0);
 
@@ -45,8 +53,8 @@ export function PhoneUploadModal({
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-muted">
               <Smartphone className="h-3.5 w-3.5 text-brand" /> Phone upload
             </div>
-            <h2 className="mt-1.5 font-serif text-[19px] text-ink">手机扫码上传手写答案</h2>
-            <p className="mt-1 text-[11px] leading-5 text-muted">用手机拍照，图片会直接传到当前这道题。</p>
+            <h2 className="mt-1.5 font-serif text-[19px] text-ink">{title}</h2>
+            <p className="mt-1 text-[11px] leading-5 text-muted">{description}</p>
           </div>
           <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-hover hover:text-ink" aria-label="关闭">
             <X className="h-4 w-4" />
@@ -85,7 +93,7 @@ export function PhoneUploadModal({
             <div className="flex h-[248px] flex-col items-center justify-center rounded-xl border border-brand/20 bg-brand-soft/40">
               <CheckCircle2 className="h-8 w-8 text-brand" />
               <p className="mt-3 text-[13px] font-medium text-ink">图片已收到</p>
-              <p className="mt-1 text-[10px] text-muted">正在填入答题区…</p>
+              <p className="mt-1 text-[10px] text-muted">{uploadedText}</p>
             </div>
           )}
 
@@ -107,7 +115,7 @@ export function PhoneUploadModal({
         </div>
 
         <div className="mt-4 text-center text-[9px] leading-4 text-faint">
-          二维码只对当前账号和本题有效，过期自动失效
+          {footer}
         </div>
       </div>
     </div>

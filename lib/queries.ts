@@ -676,6 +676,7 @@ export function saveTutorMessage(
     toolCalls?: unknown; toolCallId?: string; toolName?: string; citations?: unknown; eventJson?: string;
     actor?: "student" | "teacher" | "supervisor" | "system";
     visible?: boolean; rejected?: boolean; replyTo?: string;
+    attachments?: unknown;
   } = {},
 ): TutorMessage {
   const id = newId("tm");
@@ -685,10 +686,11 @@ export function saveTutorMessage(
   const actor = extras.actor || (role === "user" ? "student" : role === "system" ? "system" : "teacher");
   const visible = extras.visible === false ? 0 : 1;
   const rejected = extras.rejected ? 1 : 0;
+  const attachments = extras.attachments ? JSON.stringify(extras.attachments) : null;
   getDb().prepare(
-    `INSERT INTO tutor_messages (id, user_id, conversation_id, role, content, quiz_id, check_id, tool_calls, tool_call_id, tool_name, sources, event_json, actor, visible, rejected, reply_to, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, userId, conversationId, role, content, quizId || null, checkId || null, toolCalls, extras.toolCallId || null, extras.toolName || null, citations, extras.eventJson || null, actor, visible, rejected, extras.replyTo || null, createdAt);
+    `INSERT INTO tutor_messages (id, user_id, conversation_id, role, content, quiz_id, check_id, tool_calls, tool_call_id, tool_name, sources, event_json, actor, visible, rejected, reply_to, attachments, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, userId, conversationId, role, content, quizId || null, checkId || null, toolCalls, extras.toolCallId || null, extras.toolName || null, citations, extras.eventJson || null, actor, visible, rejected, extras.replyTo || null, attachments, createdAt);
   getDb().prepare(`UPDATE tutor_conversations SET updated_at = ? WHERE id = ? AND user_id = ?`)
     .run(createdAt, conversationId, userId);
   return {
@@ -724,6 +726,7 @@ export function getTutorMessages(userId: string, conversationId: string, limit?:
       actor: row.actor || undefined,
       rejected: Number(row.rejected) === 1 || undefined,
       replyTo: row.reply_to || undefined,
+      attachments: row.attachments ? parseJson(row.attachments, undefined) : undefined,
     };
   });
 }
@@ -763,6 +766,7 @@ export function getTutorHistory(userId: string, conversationId: string, excludeI
       rejected: Number(row.rejected) === 1 || undefined,
       replyTo: row.reply_to || undefined,
       visible: Number(row.visible) === 0 ? false : undefined,
+      attachments: row.attachments ? parseJson(row.attachments, undefined) : undefined,
     }];
   });
 }

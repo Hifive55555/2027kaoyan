@@ -327,6 +327,16 @@ function migrate(db: DatabaseSync) {
       used_at TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS random_deferred (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      question_id TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      due_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(user_id, question_id)
+    );
+
     CREATE TABLE IF NOT EXISTS random_attempts (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -395,6 +405,7 @@ function migrate(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_random_user ON random_attempts(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_random_generated_user ON random_generated_questions(user_id, used_at, created_at);
     CREATE INDEX IF NOT EXISTS idx_random_messages ON random_messages(user_id, question_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_random_deferred_user ON random_deferred(user_id, due_at);
     CREATE INDEX IF NOT EXISTS idx_tutor_messages_user ON tutor_messages(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_tutor_conversations_user ON tutor_conversations(user_id, updated_at);
     CREATE INDEX IF NOT EXISTS idx_tutor_quizzes_user ON tutor_quizzes(user_id, created_at);
@@ -422,6 +433,7 @@ function migrate(db: DatabaseSync) {
   addColumn(db, "tutor_messages", "visible", "INTEGER NOT NULL DEFAULT 1");
   addColumn(db, "tutor_messages", "rejected", "INTEGER NOT NULL DEFAULT 0");
   addColumn(db, "tutor_messages", "reply_to", "TEXT");
+  addColumn(db, "tutor_messages", "attachments", "TEXT");
   addColumn(db, "tutor_roadmap", "conversation_id", "TEXT");
   addColumn(db, "tutor_roadmap", "manual", "INTEGER NOT NULL DEFAULT 0");
   db.exec(`CREATE INDEX IF NOT EXISTS idx_tutor_messages_conversation ON tutor_messages(conversation_id, created_at);`);

@@ -249,6 +249,7 @@ export function buildTutorMessages(input: {
     name?: string;
   }[];
   currentUser?: string;
+  currentImages?: string[];
 }) {
   const system = `你是「备考台」的一对一考研学习导师。你的目标不是替学生把答案讲完，而是让学生最终能独立解释、独立解题。
 
@@ -333,10 +334,18 @@ export function buildTutorMessages(input: {
 
 直接输出给学生的回复，不要 JSON、不要代码围栏、不要解释这些规则。`;
 
+  const currentText = input.currentUser
+    || (input.currentImages?.length ? "请看这张图，帮我看看问题出在哪。" : "");
+  const currentContent = input.currentImages?.length
+    ? [
+        { type: "text" as const, text: currentText },
+        ...input.currentImages.map(url => ({ type: "image_url" as const, image_url: { url } })),
+      ]
+    : currentText;
   return [
     { role: "system" as const, content: system },
     ...normalizeTutorHistory(input.history),
-    ...(input.currentUser ? [{ role: "user" as const, content: input.currentUser }] : []),
+    ...(currentText ? [{ role: "user" as const, content: currentContent }] : []),
   ];
 }
 

@@ -185,7 +185,73 @@ export async function fillRandomBuffer(userId: string): Promise<void> {
   }
 }
 
+const DEFER_MS = 15 * 60 * 1000;
+
+export interface DeferredRandomQuestion {
+  id: string;
+  question: RandomQuestionPublic;
+  dueAt: string;
+  createdAt: string;
+}
+
+function deferredFromRow(row: { id: string; payload: string; due_at: string; created_at: string }): DeferredRandomQuestion | null {
+  try {
+    return { id: row.id, question: JSON.parse(row.payload) as RandomQuestionPublic, dueAt: row.due_at, createdAt: row.created_at };
+  } catch {
+    return null;
+  }
+}
+
+export function listDeferredRandomQuestions(userId: string): DeferredRandomQuestion[] {
+  const rows = getDb().prepare(
+    `SELECT id, payload, due_at, created_at FROM random_deferred WHERE user_id = ? ORDER BY due_at ASC`
+  ).all(userId) as { id: string; payload: string; due_at: string; created_at: string }[];
+  return rows.map(deferredFromRow).filter((item): item is DeferredRandomQuestion => !!item);
+}
+
+export function deferRandomQuestion(userId: string, question: RandomQuestionPublic): DeferredRandomQuestion[] {
+  const db = getDb();
+  const now = new Date();
+  const dueAt = new Date(now.getTime() + DEFER_MS).toISOString();
+  db.prepare(
+    `INSERT INTO random_deferred (id, user_id, question_id, payload, due_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, question_id) DO UPDATE SET
+       payload = excluded.payload, due_at = excluded.due_at, created_at = excluded.created_at`
+  ).run(newId("rd"), userId, question.id, JSON.stringify(question), dueAt, now.toISOString());
+  return listDeferredRandomQuestions(userId);
+}
+
+export function takeDeferredRandomQuestion(
+  userId: string,
+  opts: { id?: string; excludeId?: string } = {},
+): RandomQuestionPublic | null {
+  const db = getDb();
+  const now = nowIso();
+  const conditions = ["user_id = ?", "due_at <= ?"];
+  const params: string[] = [userId, now];
+  if (opts.id) { conditions.push("id = ?"); params.push(opts.id); }
+  if (opts.excludeId) { conditions.push("question_id != ?"); params.push(opts.excludeId); }
+  const row = db.prepare(
+    `SELECT id, payload FROM random_deferred WHERE ${conditions.join(" AND ")} ORDER BY due_at ASC LIMIT 1`
+  ).get(...params) as { id: string; payload: string } | undefined;
+  if (!row) return null;
+  db.prepare(`DELETE FROM random_deferred WHERE id = ? AND user_id = ?`).run(row.id, userId);
+  try {
+    return { ...(JSON.parse(row.payload) as RandomQuestionPublic), deferred: true };
+  } catch {
+    return null;
+  }
+}
+
+export function removeDeferredRandomQuestion(userId: string, id: string): boolean {
+  return Number(getDb().prepare(`DELETE FROM random_deferred WHERE id = ? AND user_id = ?`).run(id, userId).changes) > 0;
+}
+
 export async function nextRandomQuestion(userId: string, excludeId?: string): Promise<RandomQuestionPublic | null> {
+  // Deferred questions stay in the queue until the student resumes them; the
+  // client prefetches the next random question, and that prefetch must not
+  // swallow a due queue item before it is shown.
   const useGenerated = Math.random() < 0.5;
   if (useGenerated) {
     const generated = takeGeneratedQuestion(userId, excludeId);
@@ -201,16 +267,23 @@ export async function nextRandomQuestion(userId: string, excludeId?: string): Pr
   return fallback ? generatedPublic(fallback) : null;
 }
 
-export function gradeRandom(userId: string, questionId: string, rawAnswer: string) {
+export function gradeRandom(
+  userId: string,
+  questionId: string,
+  rawAnswer: string,
+  opts: { dontKnow?: boolean } = {},
+) {
   const q = pool().byId.get(questionId) || generatedRow(userId, questionId);
   if (!q) throw new Error("题目不存在");
+  const dontKnow = opts.dontKnow === true;
   const answer = String(rawAnswer || "").toUpperCase().replace(/[^A-Z]/g, "");
-  const correct = answer === answerLetter(q);
+  const correct = !dontKnow && answer === answerLetter(q);
+  const stored = dontKnow ? "不会" : answer;
   const db = getDb();
   db.prepare(
     `INSERT INTO random_attempts (id, user_id, question_id, subject, chapter, answer, correct, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(newId("ra"), userId, q.id, q.subject, q.chapter, answer, correct ? 1 : 0, nowIso());
+  ).run(newId("ra"), userId, q.id, q.subject, q.chapter, stored, correct ? 1 : 0, nowIso());
   return {
     correct,
     answer: answerLetter(q),

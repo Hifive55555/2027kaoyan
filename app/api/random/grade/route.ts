@@ -11,8 +11,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const questionId = String(body.questionId || "");
     const answer = String(body.answer || "");
-    if (!questionId || !answer) return Response.json({ error: "缺少参数" }, { status: 400 });
-    return Response.json(gradeRandom(auth.userId, questionId, answer));
+    const dontKnow = body.dontKnow === true;
+    if (!questionId || (!answer && !dontKnow)) return Response.json({ error: "缺少参数" }, { status: 400 });
+    return Response.json(gradeRandom(auth.userId, questionId, answer, { dontKnow }));
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : "批改失败" }, { status: 500 });
   }

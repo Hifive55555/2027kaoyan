@@ -7,7 +7,7 @@ import {
   Loader2, MessageCircle, QrCode, RefreshCw, SkipForward, Sparkles, Trash2, X, AlertCircle,
 } from "lucide-react";
 import type { AttemptPublic, GradeFeedback, PaperPublic, QuestionPublic } from "@/lib/types";
-import { isChoiceType, isMultiType, typeLabel, TYPE_COLOR } from "@/lib/subjects";
+import { isChoiceType, isMultiType, SUBJECTS, typeLabel, TYPE_COLOR } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, Progress, Spinner } from "./ui";
 import { Markdown } from "./Markdown";
@@ -541,7 +541,7 @@ export function PracticeClient({ initialPaper, initialQuestionId }: { initialPap
         </aside>
       </div>
 
-      <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} question={current} reveal={reveal} attempt={attempt} />
+      <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} question={current} subjectName={SUBJECTS.find(s => s.id === paper.subject)?.short} reveal={reveal} attempt={attempt} />
       <PhoneUploadModal
         open={phoneOpen}
         url={phoneTicket?.url || ""}

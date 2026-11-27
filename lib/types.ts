@@ -245,6 +245,14 @@ export interface TutorMessage {
   replyTo?: string;
   /** false = internal row (retry prompt, tool turn); model sees it, UI does not. */
   visible?: boolean;
+  /** Images attached to a user message. */
+  attachments?: TutorAttachment[];
+}
+
+export interface TutorAttachment {
+  /** /api/uploads/<file> */
+  path: string;
+  name?: string;
 }
 
 export type TutorSourceType = "bank" | "knowledge" | "syllabus";

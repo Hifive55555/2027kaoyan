@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, ChevronRight, Dices, Loader2, MessageCircle, RefreshCw, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Clock3, Dices, Loader2, MessageCircle, RefreshCw, X } from "lucide-react";
 import { Markdown } from "./Markdown";
 import { ThemeToggle } from "./ThemeToggle";
 import { ChatPanel } from "./ChatPanel";
@@ -20,11 +20,18 @@ type RQ = {
   topic: string;
   difficulty: string;
   generated?: boolean;
+  deferred?: boolean;
   stem: string;
   options: { key: string; text: string }[];
 };
 
 type RResult = { correct: boolean; answer: string; explanation: string; topic: string; chapter: string };
+type DeferredItem = { id: string; question: RQ; dueAt: string; remainingMs: number };
+
+function remainingText(ms: number) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
 
 const SUBJECT_STYLE: Record<string, string> = {
   math2: "bg-brand-soft text-brand",
@@ -48,6 +55,11 @@ export function RandomClient({ initial, initialStats, displayName }: {
   const [loadingNext, setLoadingNext] = useState(false);
   const [error, setError] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  const [deferred, setDeferred] = useState<DeferredItem[]>([]);
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  const [notice, setNotice] = useState("");
+  const [deferring, setDeferring] = useState(false);
   const prefetching = useRef(false);
 
   const fetchNext = useCallback(async (exclude?: string): Promise<RQ | null> => {
@@ -71,16 +83,16 @@ export function RandomClient({ initial, initialStats, displayName }: {
     });
   }, [current.id, next, fetchNext]);
 
-  async function choose(key: string) {
+  async function choose(key: string, dontKnow = false) {
     if (result || loading) return;
-    setSelected(key);
+    setSelected(dontKnow ? "" : key);
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/random/grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId: current.id, answer: key }),
+        body: JSON.stringify({ questionId: current.id, answer: key, dontKnow }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "批改失败");
@@ -112,8 +124,80 @@ export function RandomClient({ initial, initialStats, displayName }: {
       setSelected("");
       setResult(null);
       setChatOpen(false);
+      void refreshDeferred();
     } finally {
       setLoadingNext(false);
+    }
+  }
+
+  const refreshDeferred = useCallback(async () => {
+    try {
+      const res = await fetch("/api/random/deferred", { cache: "no-store" });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.items)) setDeferred(data.items as DeferredItem[]);
+    } catch { /* keep current queue */ }
+  }, []);
+
+  useEffect(() => { void refreshDeferred(); }, [refreshDeferred]);
+
+  useEffect(() => {
+    if (!deferred.length && !queueOpen) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [deferred.length, queueOpen]);
+
+  function flash(message: string) {
+    setNotice(message);
+    setTimeout(() => setNotice(""), 2600);
+  }
+
+  async function deferCurrent() {
+    if (deferring || loading || result) return;
+    setDeferring(true);
+    setError("");
+    try {
+      const res = await fetch("/api/random/deferred", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: current }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "加入队列失败");
+      if (Array.isArray(data.items)) setDeferred(data.items);
+      flash("已放入等会刷，15 分钟后回来");
+      await advance();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "加入队列失败");
+    } finally {
+      setDeferring(false);
+    }
+  }
+
+  async function actOnDeferred(id: string, action: "resume" | "remove") {
+    setError("");
+    try {
+      const res = await fetch(`/api/random/deferred/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (Array.isArray(data.items)) setDeferred(data.items);
+      if (!res.ok) {
+        flash(data.error || "操作失败");
+        return;
+      }
+      if (action === "resume" && data.question) {
+        setCurrent(data.question);
+        setSelected("");
+        setResult(null);
+        setChatOpen(false);
+        setNext(null);
+        setQueueOpen(false);
+        flash("已恢复这道题");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "操作失败");
     }
   }
 
@@ -181,13 +265,59 @@ export function RandomClient({ initial, initialStats, displayName }: {
             <span className={cn("rounded-full px-2.5 py-1", SUBJECT_STYLE[current.subject] || "bg-surface-2 text-muted")}>
               {current.subjectName}
             </span>
+            {current.deferred && <span className="rounded-full bg-brand-soft px-2 py-0.5 text-brand">队列恢复</span>}
             <span>{current.year ? `${current.year} 年 · 第 ${current.number} 题` : current.generated ? `AI 生成 · ${current.difficulty}` : current.difficulty}</span>
             <span className="hidden sm:inline">· {current.chapter}</span>
           </div>
-          <button onClick={() => advance(true)} disabled={loadingNext || !!result} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] text-faint hover:bg-hover hover:text-ink disabled:opacity-30">
-            <RefreshCw className={cn("h-3 w-3", loadingNext && "animate-spin")} /> 换一题
-          </button>
+          <div className="flex items-center gap-1.5">
+            {deferred.length > 0 && (
+              <button
+                onClick={() => setQueueOpen(value => !value)}
+                className="inline-flex items-center gap-1 rounded-lg border border-line bg-surface px-2 py-1 text-[10px] text-muted hover:border-line-strong hover:text-ink"
+              >
+                <Clock3 className="h-3 w-3" /> 等会刷 {deferred.length}
+              </button>
+            )}
+            <button onClick={() => advance(true)} disabled={loadingNext || !!result} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] text-faint hover:bg-hover hover:text-ink disabled:opacity-30">
+              <RefreshCw className={cn("h-3 w-3", loadingNext && "animate-spin")} /> 换一题
+            </button>
+          </div>
         </div>
+
+        {queueOpen && (
+          <div className="mb-3 rounded-xl border border-line bg-surface p-3">
+            <div className="flex items-center justify-between text-[10px] text-muted">
+              <span>等会刷 · 到点自动恢复</span>
+              <button onClick={() => setQueueOpen(false)} aria-label="收起队列" className="rounded p-0.5 hover:bg-hover hover:text-ink"><X className="h-3.5 w-3.5" /></button>
+            </div>
+            {deferred.length === 0 ? (
+              <p className="mt-2 text-[10px] text-faint">队列是空的。</p>
+            ) : (
+              <ul className="mt-2 space-y-1.5">
+                {deferred.map(item => {
+                  const remaining = new Date(item.dueAt).getTime() - now;
+                  const due = remaining <= 0;
+                  return (
+                    <li key={item.id} className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 px-2.5 py-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[9px] text-faint">{item.question.subjectName} · {item.question.chapter}</div>
+                        <div className="truncate text-[10px] leading-4 text-ink">{item.question.stem}</div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {due ? (
+                          <button onClick={() => actOnDeferred(item.id, "resume")} className="rounded-md bg-ink px-2 py-1 text-[9px] text-paper">现在做</button>
+                        ) : (
+                          <span className="text-[9px] text-faint">{remainingText(remaining)} 后</span>
+                        )}
+                        <button onClick={() => actOnDeferred(item.id, "remove")} aria-label="移出队列" className="rounded p-0.5 text-faint hover:bg-hover hover:text-ink"><X className="h-3 w-3" /></button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
 
         <section className="rounded-2xl border border-line bg-surface p-5 shadow-[0_12px_40px_rgba(60,50,30,0.05)] sm:p-8">
           <Markdown className="text-[16px] leading-[1.95] sm:text-[17px]">{current.stem}</Markdown>
@@ -227,9 +357,22 @@ export function RandomClient({ initial, initialStats, displayName }: {
           {error && <div className="mt-4 rounded-lg border border-accent/20 bg-accent-soft px-3 py-2 text-[11px] text-accent">{error}</div>}
 
           {!result && (
-            <div className="mt-5 flex items-center justify-between text-[10px] text-faint">
-              <span>{loading ? "判分中…" : "点击选项立即判分 · 键盘 1—4 / A—D"}</span>
-              <span className="hidden sm:inline">答错也没关系，看完解析再下一题</span>
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => choose("", true)}
+                disabled={loading}
+                className="inline-flex h-9 items-center rounded-lg border border-line bg-surface px-3 text-[11px] text-muted hover:border-line-strong hover:text-ink disabled:opacity-40"
+              >
+                不会，直接看解析
+              </button>
+              <button
+                onClick={deferCurrent}
+                disabled={loading || deferring || loadingNext}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[11px] text-muted hover:border-line-strong hover:text-ink disabled:opacity-40"
+              >
+                {deferring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock3 className="h-3.5 w-3.5" />} 等会刷
+              </button>
+              <span className="ml-auto text-[10px] text-faint">{loading ? "判分中…" : "键盘 1—4 / A—D"}</span>
             </div>
           )}
 
@@ -267,10 +410,17 @@ export function RandomClient({ initial, initialStats, displayName }: {
         </div>
       </div>
 
+      {notice && (
+        <div className="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-[11px] text-paper shadow-lg">
+          {notice}
+        </div>
+      )}
+
       <ChatPanel
         open={chatOpen}
         onClose={() => setChatOpen(false)}
         question={chatQuestion}
+        subjectName={current.subjectName}
         reveal={result ? { answer: result.answer, explanation: result.explanation } : undefined}
         apiPath="/api/random/chat"
       />

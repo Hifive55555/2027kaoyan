@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle, BookOpen, CheckCircle2, ChevronDown, GraduationCap, Loader2, MessageCircle,
-  Plus, Route, Send, Sparkles, Target, X,
+  Paperclip, Plus, QrCode, Route, Send, Sparkles, Target, X,
 } from "lucide-react";
 import type { LearnerProfile, TutorCheckPublic, TutorConversationPublic, TutorMessage, TutorQuizPublic, TutorRoadmapItem, TutorSource } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,8 @@ import { TutorSources } from "./TutorSources";
 import { TutorCitation } from "./TutorCitation";
 import { TutorSourceModal } from "./TutorSourceModal";
 import { TutorSupervisionCard } from "./TutorSupervisionCard";
+import { PhoneUploadModal, type PhoneUploadStatus } from "./PhoneUploadModal";
+import { compressImage } from "@/lib/image";
 
 function pct(n: number) {
   return `${Math.round(n)}%`;
@@ -84,13 +86,14 @@ function subjectName(id: string) {
 }
 
 export function TutorClient({
-  initialConversation, initialMessages, initialProfile, initialGoal, initialRoadmap, suggestions,
+  initialConversation, initialMessages, initialProfile, initialGoal, initialRoadmap, initialContinue = false, suggestions,
 }: {
   initialConversation: TutorConversationPublic;
   initialMessages: TutorMessage[];
   initialProfile: LearnerProfile;
   initialGoal: string;
   initialRoadmap: TutorRoadmapItem[];
+  initialContinue?: boolean;
   suggestions: string[];
 }) {
   const [conversation, setConversation] = useState(initialConversation);
@@ -112,6 +115,23 @@ export function TutorClient({
   const [conversationOpen, setConversationOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const continuedRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingImages, setPendingImages] = useState<{ path: string; name: string; preview: string }[]>([]);
+  const [uploading, setUploading] = useState(0);
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const [phoneTicket, setPhoneTicket] = useState<{ token: string; url: string; expiresAt: string } | null>(null);
+  const [phoneStatus, setPhoneStatus] = useState<PhoneUploadStatus>("creating");
+  const [phoneError, setPhoneError] = useState("");
+
+  // Arriving from the follow-up panel: answer the seeded question immediately
+  // and drop the one-shot flag so a refresh does not ask again.
+  useEffect(() => {
+    if (!initialContinue || continuedRef.current) return;
+    continuedRef.current = true;
+    window.history.replaceState({}, "", `/tutor?c=${conversation.id}`);
+    void runTutorStream({ conversationId: conversation.id, continue: true });
+  }, [initialContinue, conversation.id]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -305,18 +325,92 @@ export function TutorClient({
     }
   }
 
+  async function uploadImages(files: FileList | File[]) {
+    const picked = Array.from(files).slice(0, Math.max(0, 3 - pendingImages.length));
+    if (!picked.length) return;
+    setUploading(count => count + picked.length);
+    for (const file of picked) {
+      try {
+        const blob = await compressImage(file);
+        const form = new FormData();
+        form.append("file", blob, "tutor.jpg");
+        const res = await fetch("/api/uploads", { method: "POST", body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "上传失败");
+        setPendingImages(prev => [...prev, { path: data.path, name: data.name, preview: data.path }].slice(0, 3));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "上传失败");
+      } finally {
+        setUploading(count => count - 1);
+      }
+    }
+  }
+
+  async function openPhoneUpload() {
+    if (phoneOpen && phoneStatus === "creating") return;
+    setPhoneOpen(true);
+    setPhoneStatus("creating");
+    setPhoneTicket(null);
+    setPhoneError("");
+    try {
+      const res = await fetch("/api/upload-tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: conversation.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.token) throw new Error(data.error || "生成二维码失败");
+      setPhoneTicket({
+        token: data.token,
+        url: `${window.location.origin}/m/upload/${data.token}`,
+        expiresAt: data.expiresAt,
+      });
+      setPhoneStatus("pending");
+    } catch (err) {
+      setPhoneError(err instanceof Error ? err.message : "生成二维码失败");
+      setPhoneStatus("error");
+    }
+  }
+
+  useEffect(() => {
+    if (!phoneOpen || phoneStatus !== "pending" || !phoneTicket) return;
+    let cancelled = false;
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/upload-tickets/${phoneTicket.token}`, { cache: "no-store" });
+        const data = await res.json();
+        if (cancelled || !res.ok) return;
+        if (data.status === "uploaded" && data.imagePath) {
+          setPendingImages(prev => [...prev, { path: data.imagePath, name: "phone.jpg", preview: data.imagePath }].slice(0, 3));
+          setPhoneStatus("uploaded");
+          setTimeout(() => { if (!cancelled) setPhoneOpen(false); }, 1200);
+        } else if (data.status === "expired") {
+          setPhoneStatus("expired");
+        }
+      } catch { /* keep polling */ }
+    }, 1500);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [phoneOpen, phoneStatus, phoneTicket]);
+
   async function send(text?: string) {
     const content = (text ?? input).trim();
-    if (!content || loading) return;
+    if ((!content && pendingImages.length === 0) || loading || uploading > 0) return;
+    const attachments = pendingImages.map(image => ({ path: image.path, name: image.name }));
     setInput("");
+    setPendingImages([]);
     const optimistic: TutorMessage = {
       id: `local-${Date.now()}`,
       role: "user",
       content,
+      attachments: attachments.length ? attachments : undefined,
       createdAt: new Date().toISOString(),
     };
     setMessages(prev => [...prev, optimistic]);
-    await runTutorStream({ message: content, conversationId: conversation.id }, { removeIds: [optimistic.id], restoreInput: content });
+    await runTutorStream({
+      message: content,
+      conversationId: conversation.id,
+      attachments: attachments.map(attachment => attachment.path),
+    }, { removeIds: [optimistic.id], restoreInput: content });
   }
 
   async function newConversation() {
@@ -565,7 +659,25 @@ export function TutorClient({
                             ) : null}
                           </>
                         ) : (
-                          <span className="whitespace-pre-wrap">{message.content}</span>
+                          <>
+                            {message.attachments?.length ? (
+                              <div className="mb-1.5 flex flex-wrap justify-end gap-1.5">
+                                {message.attachments.map(image => (
+                                  <a
+                                    key={image.path}
+                                    href={image.path}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="block h-24 w-24 overflow-hidden rounded-lg border border-line"
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={image.path} alt="附件" className="h-full w-full object-cover" />
+                                  </a>
+                                ))}
+                              </div>
+                            ) : null}
+                            {message.content ? <span className="whitespace-pre-wrap">{message.content}</span> : null}
+                          </>
                         )}
                       </div>
                     </div>
@@ -587,7 +699,53 @@ export function TutorClient({
             </div>
           )}
           <div className="border-t border-line bg-sand px-2.5 py-2.5 sm:px-4 sm:py-3">
-            <div className="flex items-end gap-2 rounded-xl border border-line bg-surface p-2">
+            <div className="rounded-xl border border-line bg-surface p-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={event => {
+                  if (event.target.files) void uploadImages(event.target.files);
+                  event.target.value = "";
+                }}
+              />
+              {pendingImages.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5 px-1">
+                  {pendingImages.map(image => (
+                    <div key={image.path} className="relative h-16 w-16 overflow-hidden rounded-lg border border-line">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={image.preview} alt="待发送附件" className="h-full w-full object-cover" />
+                      <button
+                        onClick={() => setPendingImages(prev => prev.filter(item => item.path !== image.path))}
+                        aria-label="移除附件"
+                        className="absolute right-0 top-0 grid h-5 w-5 place-items-center rounded-bl bg-ink/70 text-paper hover:bg-ink"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mb-1 flex items-center gap-1 px-1">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!!conversation.archivedAt || uploading > 0}
+                  className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[10px] text-faint hover:bg-hover hover:text-ink disabled:opacity-40"
+                >
+                  <Paperclip className="h-3.5 w-3.5" /> 图片
+                </button>
+                <button
+                  onClick={openPhoneUpload}
+                  disabled={!!conversation.archivedAt}
+                  className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[10px] text-faint hover:bg-hover hover:text-ink disabled:opacity-40"
+                >
+                  <QrCode className="h-3.5 w-3.5" /> 手机扫码
+                </button>
+                {uploading > 0 && <span className="text-[9px] text-faint">上传中 {uploading}…</span>}
+              </div>
+              <div className="flex items-end gap-2">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -602,12 +760,13 @@ export function TutorClient({
               />
               <button
                 onClick={() => send()}
-                disabled={loading || !input.trim() || !!conversation.archivedAt}
+                disabled={loading || uploading > 0 || (!input.trim() && pendingImages.length === 0) || !!conversation.archivedAt}
                 className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink text-paper disabled:opacity-40"
                 aria-label="发送"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               </button>
+              </div>
             </div>
             <div className="mt-1.5 hidden text-center text-[9px] text-faint sm:block">老师会参考你的做题档案；关键结论仍请以教材和真题解析为准</div>
           </div>
@@ -620,6 +779,18 @@ export function TutorClient({
       </div>
 
       <TutorSourceModal source={activeSource} onClose={() => setActiveSource(null)} />
+      <PhoneUploadModal
+        open={phoneOpen}
+        url={phoneTicket?.url || ""}
+        status={phoneStatus}
+        error={phoneError}
+        expiresAt={phoneTicket?.expiresAt}
+        onClose={() => setPhoneOpen(false)}
+        title="手机扫码上传图片"
+        description="拍照或从相册选择，图片会附在当前的答疑消息里。"
+        uploadedText="正在加入附件…"
+        footer="二维码只对当前账号和本会话有效，过期自动失效"
+      />
     </div>
   );
 }

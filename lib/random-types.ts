@@ -11,6 +11,8 @@ export interface RandomQuestionPublic {
   stem: string;
   options: { key: string; text: string }[];
   generated?: boolean;
+  /** Served from the "等会刷" queue. */
+  deferred?: boolean;
 }
 
 export interface GeneratedRandomQuestion extends RandomQuestionPublic {

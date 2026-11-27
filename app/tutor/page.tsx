@@ -6,7 +6,7 @@ import { getOrCreateActiveTutorConversation, getTutorMessages, getTutorRoadmap }
 
 export const dynamic = "force-dynamic";
 
-export default async function TutorPage({ searchParams }: { searchParams: Promise<{ c?: string }> }) {
+export default async function TutorPage({ searchParams }: { searchParams: Promise<{ c?: string; continue?: string }> }) {
   const session = await requireUserPage();
   const sp = await searchParams;
   const conversation = getOrCreateActiveTutorConversation(session.userId!, sp.c);
@@ -21,6 +21,7 @@ export default async function TutorPage({ searchParams }: { searchParams: Promis
         initialProfile={profile}
         initialGoal={profile.goal}
         initialRoadmap={roadmap}
+        initialContinue={sp.continue === "1"}
         suggestions={learnerSuggestions(profile)}
       />
     </AppShell>

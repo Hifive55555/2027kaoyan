@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Send, Loader2, Sparkles } from "lucide-react";
+import { ArrowUpRight, X, Send, Loader2, Sparkles } from "lucide-react";
 import type { AttemptPublic, ChatMessage, QuestionPublic } from "@/lib/types";
 import { Markdown } from "./Markdown";
 import { cn } from "@/lib/utils";
@@ -14,13 +14,14 @@ const SUGGESTIONS = [
 ];
 
 export function ChatPanel({
-  open, onClose, question, reveal, attempt, apiPath = "/api/chat",
+  open, onClose, question, reveal, attempt, subjectName, apiPath = "/api/chat",
 }: {
   open: boolean;
   onClose: () => void;
   question: QuestionPublic;
   reveal?: { answer: string; explanation: string };
   attempt?: AttemptPublic | null;
+  subjectName?: string;
   apiPath?: string;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -28,6 +29,7 @@ export function ChatPanel({
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState("");
   const [error, setError] = useState("");
+  const [switching, setSwitching] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -96,6 +98,39 @@ export function ChatPanel({
     }
   }
 
+  async function toTutor() {
+    if (switching) return;
+    setSwitching(true);
+    setError("");
+    try {
+      const res = await fetch("/api/tutor/from-question", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: {
+            id: question.id,
+            subjectName: subjectName || "",
+            chapter: question.chapter,
+            topic: question.topic,
+            stem: question.stem,
+            options: question.options,
+            type: question.type,
+            difficulty: question.difficulty,
+          },
+          attempt: attempt ? { answer: attempt.answer, correct: attempt.verdict === "correct" } : null,
+          reveal,
+          messages: messages.slice(-6).map(message => ({ role: message.role, content: message.content })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.conversationId) throw new Error(data.error || "转入答疑失败");
+      window.location.href = `/tutor?c=${data.conversationId}${data.continue ? "&continue=1" : ""}`;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "转入答疑失败");
+      setSwitching(false);
+    }
+  }
+
   if (!open) return null;
 
   return (
@@ -111,9 +146,20 @@ export function ChatPanel({
             </div>
             <div className="mt-1 line-clamp-1 font-serif text-[15px]">{question.topic || question.chapter}</div>
           </div>
-          <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-hover hover:text-ink">
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toTutor}
+              disabled={switching}
+              title="在常驻的答疑里继续这道题"
+              className="inline-flex h-7 items-center gap-1 rounded-full border border-line bg-surface px-2.5 text-[10px] text-muted hover:border-line-strong hover:text-ink disabled:opacity-40"
+            >
+              {switching ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowUpRight className="h-3 w-3" />}
+              转答疑
+            </button>
+            <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-hover hover:text-ink">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">

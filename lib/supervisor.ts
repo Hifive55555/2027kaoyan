@@ -87,7 +87,7 @@ function renderRow(userId: string, row: TutorMessage): string {
   if (row.role === "system") return row.content;
   if (row.role === "assistant" && row.toolCalls?.length && !row.content) return "";
   if (row.actor === "system") return row.content;
-  if (row.role === "user") return `【学生】${row.content}`;
+  if (row.role === "user") return `【学生】${row.content || (row.attachments?.length ? "（发来一张图片）" : "")}`;
   if (row.quiz) return quizBlock(userId, row);
   if (row.check) return checkBlock(userId, row);
   const text = stripCitations(row.content);

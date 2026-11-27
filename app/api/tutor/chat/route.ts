@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { requireUserApi } from "@/lib/auth";
 import { streamChatWithTools, type ChatMessageInput } from "@/lib/deepseek";
 import { buildTutorMessages } from "@/lib/prompts";
@@ -20,6 +22,7 @@ import {
   getTutorQuizRaw,
   attachTutorCard,
   getTutorRoadmap,
+  getUploadOwner,
   markTutorMessageRejected,
   replaceTutorConversationTitle,
   saveTutorMessage,
@@ -65,9 +68,12 @@ function toTeacherHistory(history: TutorMessage[]): TeacherHistoryRow[] {
         content: `【督导】${reviewBody(message.content)}\n\n（上一版回答已撤回，不会发给学生。请直接回答学生最后一条消息，不要回答督导。）`,
       }];
     }
+    const content = !message.content.trim() && message.attachments?.length
+      ? "（学生发来一张图片）"
+      : message.content;
     return [{
       role: message.role === "tool" ? "tool" as const : message.role === "assistant" ? "assistant" as const : "user" as const,
-      content: message.content,
+      content,
       toolCalls: message.toolCalls,
       toolCallId: message.toolCallId,
       name: message.toolName,
@@ -80,6 +86,7 @@ function lastStudentInput(history: TutorMessage[]): string {
     const row = history[i];
     if (row.role !== "user" || row.actor === "supervisor" || row.visible === false) continue;
     if (row.content.trim()) return row.content;
+    if (row.attachments?.length) return "（学生发来一张图片）";
   }
   return "";
 }
@@ -89,6 +96,7 @@ async function runTutorTurn(input: {
   conversationId: string;
   history: TutorMessage[];
   currentUser?: string;
+  currentImages?: string[];
   fallback: string;
   send: (obj: unknown) => void;
 }): Promise<{ message: TutorMessage; reply: string }> {
@@ -100,6 +108,7 @@ async function runTutorTurn(input: {
   const messages: ChatMessageInput[] = buildTutorMessages({
     history: toTeacherHistory(input.history),
     currentUser: input.currentUser,
+    currentImages: input.currentImages,
   });
 
   while (true) {
@@ -215,6 +224,7 @@ function streamTutorReply(input: {
   conversationId: string;
   history: ReturnType<typeof getTutorHistory>;
   currentUser?: string;
+  currentImages?: string[];
   fallback: string;
   userMessageId?: string;
   firstTurn?: boolean;
@@ -234,6 +244,7 @@ function streamTutorReply(input: {
           conversationId: input.conversationId,
           history: input.history,
           currentUser: input.currentUser,
+          currentImages: input.currentImages,
           fallback: input.fallback,
           send,
         });
@@ -406,8 +417,36 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (body.continue === true) {
+      const conversationId = String(body.conversationId || "");
+      const conversation = conversationId ? getTutorConversation(auth.userId, conversationId) : null;
+      if (!conversation) return Response.json({ error: "对话不存在" }, { status: 404 });
+      if (conversation.archivedAt) return Response.json({ error: "对话已归档，请先取消归档" }, { status: 409 });
+      return streamTutorReply({
+        userId: auth.userId,
+        conversationId: conversation.id,
+        history: getTutorHistory(auth.userId, conversation.id),
+        fallback: "我先不急着讲完整。你想从哪一步开始？",
+      });
+    }
+
     const message = String(body.message || "").trim().slice(0, 2000);
-    if (!message) return Response.json({ error: "写点什么再问老师" }, { status: 400 });
+    const rawAttachments = Array.isArray(body.attachments) ? body.attachments.slice(0, 3) : [];
+    const attachments: { path: string; name: string }[] = [];
+    const currentImages: string[] = [];
+    for (const raw of rawAttachments) {
+      const file = path.basename(String(raw?.path || raw || ""));
+      if (!file || getUploadOwner(file) !== auth.userId) continue;
+      try {
+        const buf = await fs.readFile(path.join(process.cwd(), "data/uploads", file));
+        if (buf.length > 6 * 1024 * 1024) continue;
+        const ext = path.extname(file).toLowerCase();
+        const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+        currentImages.push(`data:${mime};base64,${buf.toString("base64")}`);
+        attachments.push({ path: `/api/uploads/${file}`, name: file });
+      } catch { /* missing upload */ }
+    }
+    if (!message && !attachments.length) return Response.json({ error: "写点什么或传一张图片" }, { status: 400 });
     const requestedConversation = String(body.conversationId || "");
     const conversation = requestedConversation
       ? getTutorConversation(auth.userId, requestedConversation)
@@ -416,13 +455,16 @@ export async function POST(req: NextRequest) {
     if (conversation.archivedAt) return Response.json({ error: "对话已归档，请先取消归档" }, { status: 409 });
 
     const firstTurn = conversation.title === "新的对话";
-    const userMessage = saveTutorMessage(auth.userId, conversation.id, "user", message);
-    if (firstTurn) titleTutorConversation(auth.userId, conversation.id, message);
+    const userMessage = saveTutorMessage(auth.userId, conversation.id, "user", message, undefined, undefined, {
+      attachments: attachments.length ? attachments : undefined,
+    });
+    if (firstTurn) titleTutorConversation(auth.userId, conversation.id, message || "图片答疑");
     return streamTutorReply({
       userId: auth.userId,
       conversationId: conversation.id,
       history: getTutorHistory(auth.userId, conversation.id, userMessage.id),
       currentUser: message,
+      currentImages,
       fallback: "我先不急着讲完整。你能说说自己目前卡在哪一步吗？",
       userMessageId: userMessage.id,
       firstTurn,
