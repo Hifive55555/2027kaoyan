@@ -118,7 +118,8 @@ export function buildSupervisorMessages(userId: string, history: TutorMessage[])
 }
 
 function parseVerdict(text: string): SupervisionVerdict {
-  const clean = text.trim();
+  // Models sometimes wrap the verdict in markdown emphasis or a heading.
+  const clean = text.trim().replace(/[*#>`_~]+/g, "").trim();
   if (/^PASS\b/i.test(clean)) return { verdict: "pass" };
   const match = clean.match(/^REVISE\b[：:]?\s*([\s\S]+)$/i);
   if (match) {
@@ -135,6 +136,12 @@ export async function reviewTutorDraft(input: {
   conversationId: string;
   history: TutorMessage[];
 }): Promise<SupervisionVerdict> {
+  const startedAt = Date.now();
+  const finish = (verdict: SupervisionVerdict): SupervisionVerdict => {
+    const elapsed = Date.now() - startedAt;
+    console.log(`[supervisor] ${verdict.verdict}${verdict.skipped ? " (skipped)" : ""} ${elapsed}ms conv=${input.conversationId}`);
+    return verdict;
+  };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REVIEW_TIMEOUT_MS);
   try {
@@ -146,7 +153,11 @@ export async function reviewTutorDraft(input: {
         () => { /* reviewers do not stream */ },
         { maxTokens: 600, temperature: 0.2, effort: "medium", signal: controller.signal },
       );
-      if (!result.toolCalls.length) return parseVerdict(result.text);
+      if (!result.toolCalls.length) {
+        const verdict = parseVerdict(result.text);
+        if (verdict.skipped) console.warn("[supervisor] unparsed review:", result.text.slice(0, 300));
+        return finish(verdict);
+      }
 
       messages.push({ role: "assistant", content: result.text || null, tool_calls: result.toolCalls });
       const sources = createTutorSourceCollector();
@@ -172,9 +183,9 @@ export async function reviewTutorDraft(input: {
       }
       messages.push({ role: "user", content: "请直接给出结论：PASS，或 REVISE 加问题与要求。" });
     }
-    return { verdict: "pass", skipped: true };
+    return finish({ verdict: "pass", skipped: true });
   } catch {
-    return { verdict: "pass", skipped: true };
+    return finish({ verdict: "pass", skipped: true });
   } finally {
     clearTimeout(timer);
   }
